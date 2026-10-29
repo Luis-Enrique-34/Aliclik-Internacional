@@ -1,0 +1,22 @@
+# Dependencias
+node_modules/
+
+# Secretos: NUNCA subir a GitHub
+.env
+.env.*
+!.env.example
+certs/
+*.pem
+*.key
+
+# Datos internos (contactos y teléfonos del Excel, exportaciones)
+database/privado/
+reportes/
+*.csv
+*.xlsx
+
+# Varios
+*.log
+.vercel
+.DS_Store
+Thumbs.db

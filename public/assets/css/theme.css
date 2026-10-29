@@ -1,0 +1,127 @@
+/* =====================================================================
+   Aliclik Internacional · Tokens de diseño (colores de la marca Aliclik)
+   Azul eléctrico #2B26FF + turquesa #07F3DF del isotipo.
+   Tema claro por defecto (igual que la plataforma Aliclik) y oscuro opcional.
+   ===================================================================== */
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --brand: #2b26ff;
+  --brand-hover: #1f1ae0;
+  --brand-soft: rgba(43, 38, 255, 0.08);
+  --brand-border: rgba(43, 38, 255, 0.28);
+  --brand-text: #2b26ff;
+  --accent: #07f3df;
+  --on-brand: #ffffff;
+
+  --bg: #f4f5fb;
+  --surface: #ffffff;
+  --surface-2: #f7f8fc;
+  --surface-3: #eef0f8;
+  --overlay: rgba(12, 13, 40, 0.45);
+
+  --sidebar: #0d0b45;
+  --sidebar-2: #17146b;
+  --sidebar-text: #c9c8f5;
+
+  --text: #15163a;
+  --text-2: #4a4c6b;
+  --text-3: #6f7191;
+  --border: #e3e5f0;
+  --border-strong: #cfd2e3;
+  --placeholder: #9a9cb5;
+
+  --ok: #0f7a4d;      --ok-soft: rgba(16, 156, 98, 0.11);
+  --warn: #8a5a00;    --warn-soft: rgba(230, 160, 20, 0.15);
+  --danger: #c0262d;  --danger-soft: rgba(220, 38, 38, 0.09);
+  --info: #1f5fd1;    --info-soft: rgba(37, 99, 235, 0.1);
+  --muted-soft: rgba(110, 112, 140, 0.12);
+
+  /* Gráficos (validados para daltonismo y contraste) */
+  --serie-1: #2b26ff;
+  --serie-2: #0e9f8f;
+  --serie-3: #d9702a;
+  --grid: #e9ebf3;
+
+  --shadow-sm: 0 1px 2px rgba(20, 22, 60, 0.06), 0 1px 3px rgba(20, 22, 60, 0.05);
+  --shadow-md: 0 8px 24px rgba(20, 22, 60, 0.08);
+  --shadow-lg: 0 24px 60px rgba(20, 22, 60, 0.18);
+  --radius: 12px;
+  --radius-sm: 8px;
+
+  --font-heading: "Montserrat", system-ui, sans-serif;
+  --font-body: "Open Sans", system-ui, sans-serif;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --brand: #6763ff;
+  --brand-hover: #7e7aff;
+  --brand-soft: rgba(103, 99, 255, 0.16);
+  --brand-border: rgba(125, 121, 255, 0.4);
+  --brand-text: #9d9aff;
+  --on-brand: #ffffff;
+
+  --bg: #0b0d22;
+  --surface: #151a33;
+  --surface-2: #1b2140;
+  --surface-3: #232a4d;
+  --overlay: rgba(0, 0, 0, 0.6);
+
+  --sidebar: #080a1d;
+  --sidebar-2: #14183a;
+  --sidebar-text: #aeb1d6;
+
+  --text: #eceefb;
+  --text-2: #b3b6d3;
+  --text-3: #8c8fb0;
+  --border: #262c4f;
+  --border-strong: #353c66;
+  --placeholder: #6b6f92;
+
+  --ok: #4ade9b;      --ok-soft: rgba(74, 222, 155, 0.12);
+  --warn: #f5c451;    --warn-soft: rgba(245, 196, 81, 0.13);
+  --danger: #ff7a7f;  --danger-soft: rgba(255, 122, 127, 0.12);
+  --info: #79a8ff;    --info-soft: rgba(121, 168, 255, 0.13);
+  --muted-soft: rgba(160, 165, 210, 0.12);
+
+  --serie-1: #7d79ff;
+  --serie-2: #0fa596;
+  --serie-3: #d47233;
+  --grid: #232a4d;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+html.tema-anim *, html.tema-anim *::before, html.tema-anim *::after {
+  transition: background-color .25s ease, border-color .25s ease, color .2s ease !important;
+}
+[data-theme="dark"] .only-light, [data-theme="light"] .only-dark { display: none !important; }
+::selection { background: var(--brand); color: #fff; }
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, h4 { font-family: var(--font-heading); margin: 0; line-height: 1.25; color: var(--text); }
+a { color: var(--brand-text); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+.theme-toggle {
+  width: 38px; height: 38px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); cursor: pointer;
+}
+.theme-toggle:hover { color: var(--brand-text); border-color: var(--brand-border); }
+[data-theme="dark"] .theme-toggle .fa-moon, [data-theme="light"] .theme-toggle .fa-sun { display: none; }
+.theme-toggle.floating { position: fixed; top: 16px; right: 16px; z-index: 50; box-shadow: var(--shadow-sm); }

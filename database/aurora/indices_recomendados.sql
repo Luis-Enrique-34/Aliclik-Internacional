@@ -1,0 +1,29 @@
+-- =====================================================================
+--  (OPCIONAL) Índices que aceleran la extracción en Aurora.
+--  Solo los crea el DBA/backend, revisando antes que no existan
+--  (SHOW INDEX FROM orders;). En tablas grandes conviene hacerlo fuera
+--  del horario pico.
+-- =====================================================================
+-- CREATE INDEX ix_orders_updated_at      ON orders (updated_at);
+-- CREATE INDEX ix_orders_created_at      ON orders (created_at);
+-- CREATE INDEX ix_order_details_order    ON order_details (order_id);
+-- CREATE INDEX ix_order_deliveries_order ON order_deliveries (order_id, is_active);
+
+-- =====================================================================
+--  Usuario de SOLO LECTURA para la sincronización automática
+--  (principio de mínimo privilegio: aunque se filtrara su contraseña,
+--  no podría modificar ni borrar nada).
+-- =====================================================================
+-- CREATE USER 'alc_internacional_ro'@'%' IDENTIFIED BY '<contraseña larga y aleatoria>' REQUIRE SSL;
+-- GRANT SELECT ON aliclik.orders            TO 'alc_internacional_ro'@'%';
+-- GRANT SELECT ON aliclik.order_details     TO 'alc_internacional_ro'@'%';
+-- GRANT SELECT ON aliclik.order_deliveries  TO 'alc_internacional_ro'@'%';
+-- GRANT SELECT ON aliclik.products          TO 'alc_internacional_ro'@'%';
+-- GRANT SELECT ON aliclik.stores            TO 'alc_internacional_ro'@'%';
+-- GRANT SELECT ON aliclik.countries         TO 'alc_internacional_ro'@'%';
+-- GRANT SELECT ON aliclik.warehouses        TO 'alc_internacional_ro'@'%';
+-- GRANT SELECT ON aliclik.couriers          TO 'alc_internacional_ro'@'%';
+-- GRANT SELECT ON aliclik.order_statuses    TO 'alc_internacional_ro'@'%';
+-- GRANT SELECT ON aliclik.shipping_statuses TO 'alc_internacional_ro'@'%';
+-- GRANT SELECT ON aliclik.delivery_statuses TO 'alc_internacional_ro'@'%';
+-- (reemplaza "aliclik" por el nombre real del esquema)
