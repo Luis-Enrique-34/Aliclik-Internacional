@@ -4,8 +4,13 @@ import { api, html, raw, $, $$, encabezado, opcion, paramsHash, modal, confirmar
 
 const OFFSET = "-05:00"; // America/Lima (sin horario de verano)
 const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+let vista = "mes";                    // "mes" (por defecto) o "dia"
 let mesActual = hoyIso().slice(0, 7); // "AAAA-MM"
+let diaActual = hoyIso();             // "AAAA-MM-DD"
 let filtroTipo = "";
+const HORA_INICIO = 7;   // la vista por día muestra de 07:00…
+const HORA_FIN = 21;     // …a 21:00 (se amplía si hay eventos fuera de ese rango)
+const ALTO_HORA = 56;    // px por hora
 
 const partes = (iso) => {
   const d = new Date(new Date(iso).getTime() - 5 * 3600 * 1000).toISOString();
@@ -16,8 +21,9 @@ const aIso = (f, h) => new Date(`${f}T${h || "00:00"}:00${OFFSET}`).toISOString(
 /** Modal para crear o editar un evento. `previo` puede traer datos para precargar. */
 export async function editorEvento(previo = {}, onGuardado) {
   const existente = Boolean(previo.id);
-  const ini = previo.inicio ? partes(previo.inicio) : { fecha: previo.fecha || hoyIso(), hora: "10:00" };
-  const fin = previo.fin ? partes(previo.fin) : { fecha: ini.fecha, hora: previo.tipo === "tarea" ? "10:30" : "11:00" };
+  const ini = previo.inicio ? partes(previo.inicio) : { fecha: previo.fecha || hoyIso(), hora: previo.hora || "10:00" };
+  const sumarMin = (hhmm, min) => { const [h, m] = hhmm.split(":").map(Number); const t = Math.min(23 * 60 + 59, h * 60 + m + min); return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; };
+  const fin = previo.fin ? partes(previo.fin) : { fecha: ini.fecha, hora: sumarMin(ini.hora, previo.tipo === "tarea" ? 30 : 60) };
   const integ = await api("/api/integraciones");
   const e = { tipo: "reunion", prioridad: "media", estado_tarea: "pendiente", sincronizar: true, asistentes: [], ...previo };
   const promesa = modal({
@@ -98,12 +104,90 @@ function ajustarCampos(form) {
 }
 new MutationObserver(() => { const f = document.querySelector(".modal [name='f_ini']")?.closest(".modal"); if (f && !f.dataset.ok) { f.dataset.ok = "1"; ajustarCampos(f); } })
   .observe(document.body, { childList: true });
-function celdaEventos(evs) {
+const sumarDias = (f, n) => new Date(Date.parse(`${f}T12:00:00Z`) + n * 86400000).toISOString().slice(0, 10);
+const diaSemana = (f) => (new Date(`${f}T12:00:00Z`).getUTCDay() + 6) % 7; // 0 = lunes
+const tituloDia = (f) => new Date(`${f}T12:00:00Z`).toLocaleDateString("es-PE", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).replace(/^./, (c) => c.toUpperCase());
+const hhmm = (iso) => partes(iso).hora; // 24 h, hora de Lima: más compacto que "10:00 a. m."
+const minutos = (iso) => { const { hora: hh } = partes(iso); const [h, m] = hh.split(":").map(Number); return h * 60 + m; };
+const claseEv = (e) => `${e.tipo === "tarea" ? "tarea" : ""} ${e.estado_tarea === "hecha" ? "hecha" : ""}`;
+const iconoG = (e) => (e.google_event_id ? raw('<i class="fab fa-google" title="Sincronizado con Google"></i>') : "");
+
+function celdaEventos(evs, dia) {
   const max = 3;
   return html`${evs.slice(0, max).map((e) => html`
-    <div class="ev ${e.tipo === "tarea" ? "tarea" : ""} ${e.estado_tarea === "hecha" ? "hecha" : ""}" data-ev="${e.id}" title="${e.titulo}">
-      ${e.todo_el_dia ? "" : html`<span class="h">${hora(e.inicio)}</span>`}${e.titulo}${e.google_event_id ? raw('<i class="fab fa-google" title="Sincronizado con Google"></i>') : ""}
-    </div>`)}${evs.length > max ? html`<div class="mas">+${evs.length - max} más</div>` : ""}`;
+    <div class="ev ${claseEv(e)}" data-ev="${e.id}" title="${e.titulo}">
+      ${e.todo_el_dia ? "" : html`<span class="h">${hhmm(e.inicio)}</span>`}${e.titulo}${iconoG(e)}
+    </div>`)}${evs.length > max ? html`<button type="button" class="mas" data-ver-dia="${dia}">+${evs.length - max} más</button>` : ""}
+    ${evs.length ? html`<div class="puntos-dia" aria-hidden="true">${evs.slice(0, 4).map((e) => html`<i class="${claseEv(e)}"></i>`)}</div>` : ""}`;
+}
+
+/** Reparte eventos que se cruzan en columnas (como en Google Calendar). */
+function columnas(evs) {
+  const orden = [...evs].sort((x, y) => minutos(x.inicio) - minutos(y.inicio) || minutos(y.fin) - minutos(x.fin));
+  const grupos = [];
+  let grupo = [];
+  let finGrupo = -1;
+  for (const e of orden) {
+    const ini = minutos(e.inicio);
+    if (grupo.length && ini >= finGrupo) { grupos.push(grupo); grupo = []; finGrupo = -1; }
+    grupo.push(e);
+    finGrupo = Math.max(finGrupo, Math.max(minutos(e.fin), ini + 20));
+  }
+  if (grupo.length) grupos.push(grupo);
+  const res = [];
+  for (const g of grupos) {
+    const finCol = [];
+    for (const e of g) {
+      const ini = minutos(e.inicio);
+      let c = finCol.findIndex((f) => f <= ini);
+      if (c === -1) { c = finCol.length; finCol.push(0); }
+      finCol[c] = Math.max(minutos(e.fin), ini + 20);
+      res.push({ e, col: c, total: 0, g });
+    }
+    const total = finCol.length;
+    res.filter((r) => r.g === g).forEach((r) => (r.total = total));
+  }
+  return res;
+}
+
+function vistaMes(dias, porDia, hoy) {
+  return html`
+    <div class="mes">
+      ${DIAS.map((d) => html`<div class="dsem">${d}</div>`)}
+      ${dias.map((d) => html`<div class="dia ${d.slice(0, 7) !== mesActual ? "fuera" : ""} ${d === hoy ? "hoy" : ""}" data-dia="${d}">
+        <button type="button" class="num" data-ver-dia="${d}" title="Ver el día">${Number(d.slice(8))}</button>${celdaEventos(porDia.get(d), d)}</div>`)}
+    </div>`;
+}
+
+function vistaDia(semana, porDia, hoy) {
+  const evs = porDia.get(diaActual) || [];
+  const todoDia = evs.filter((e) => e.todo_el_dia || partes(e.inicio).fecha !== diaActual || partes(e.fin).fecha !== diaActual);
+  const conHora = evs.filter((e) => !todoDia.includes(e));
+  const hIni = Math.min(HORA_INICIO, ...conHora.map((e) => Math.floor(minutos(e.inicio) / 60)));
+  const hFin = Math.max(HORA_FIN, ...conHora.map((e) => Math.ceil(minutos(e.fin) / 60)));
+  const horas = Array.from({ length: hFin - hIni }, (_, i) => hIni + i);
+  const ahora = new Date(Date.now() - 5 * 3600 * 1000);
+  const minAhora = ahora.getUTCHours() * 60 + ahora.getUTCMinutes();
+  return html`
+    <div class="semana" role="tablist" aria-label="Días de la semana">
+      ${semana.map((d) => {
+        const n = (porDia.get(d) || []).length;
+        return html`<button type="button" class="semana-dia ${d === diaActual ? "activo" : ""} ${d === hoy ? "hoy" : ""}" data-ver-dia="${d}" role="tab" aria-selected="${d === diaActual ? "true" : "false"}">
+          <small>${DIAS[diaSemana(d)]}</small><b>${Number(d.slice(8))}</b><span>${n ? `${n} evento${n > 1 ? "s" : ""}` : "—"}</span></button>`;
+      })}
+    </div>
+    ${todoDia.length ? html`<div class="todo-dia"><span class="muted">Todo el día</span>${todoDia.map((e) => html`<div class="ev ${claseEv(e)}" data-ev="${e.id}">${e.titulo}${iconoG(e)}</div>`)}</div>` : ""}
+    <div class="tiempo-scroll"><div class="linea-tiempo" style="height:${horas.length * ALTO_HORA}px">
+      ${horas.map((h, i) => html`<div class="hora-fila" data-hora="${String(h).padStart(2, "0")}:00" style="top:${i * ALTO_HORA}px"><span>${String(h).padStart(2, "0")}:00</span></div>`)}
+      ${diaActual === hoy && minAhora >= hIni * 60 && minAhora <= hFin * 60 ? html`<div class="ahora" style="top:${((minAhora - hIni * 60) / 60) * ALTO_HORA}px" title="Hora actual"></div>` : ""}
+      <div class="bloques">${columnas(conHora).map(({ e, col, total }) => {
+        const top = ((minutos(e.inicio) - hIni * 60) / 60) * ALTO_HORA;
+        const alto = Math.max(22, ((minutos(e.fin) - minutos(e.inicio)) / 60) * ALTO_HORA - 2);
+        return html`<div class="bloque ${claseEv(e)}${alto < 44 ? " corto" : ""}" data-ev="${e.id}" style="top:${top}px;height:${alto}px;left:calc(${(col / total) * 100}% + 2px);width:calc(${100 / total}% - 4px)">
+          <strong>${e.titulo}</strong><span>${hhmm(e.inicio)} – ${hhmm(e.fin)}${e.ubicacion ? ` · ${e.ubicacion}` : ""}</span>${iconoG(e)}</div>`;
+      })}</div>
+    </div></div>
+    ${!evs.length ? html`<p class="muted" style="text-align:center;margin-top:10px">Sin reuniones ni tareas este día. Haz clic en una hora para agendar.</p>` : ""}`;
 }
 
 export async function render(cont) {
@@ -111,11 +195,19 @@ export async function render(cont) {
   if (h.google === "ok") { toast("Google Calendar conectado. Tus eventos se sincronizarán en ambos sentidos."); history.replaceState(null, "", "#/calendario"); }
   if (h.google === "error") { toast(h.msg || "No se pudo conectar con Google", "error"); history.replaceState(null, "", "#/calendario"); }
 
-  const [a, m] = mesActual.split("-").map(Number);
-  const primero = new Date(Date.UTC(a, m - 1, 1));
-  const inicioGrid = new Date(primero.getTime() - ((primero.getUTCDay() + 6) % 7) * 86400000);
-  const dias = Array.from({ length: 42 }, (_, i) => new Date(inicioGrid.getTime() + i * 86400000).toISOString().slice(0, 10));
-  const desde = aIso(dias[0], "00:00"), hasta = aIso(dias[41], "23:59");
+  const hoy = hoyIso();
+  let dias;
+  let semana = [];
+  if (vista === "mes") {
+    const primero = `${mesActual}-01`;
+    const inicio = sumarDias(primero, -diaSemana(primero));
+    dias = Array.from({ length: 42 }, (_, i) => sumarDias(inicio, i));
+  } else {
+    const lunes = sumarDias(diaActual, -diaSemana(diaActual));
+    semana = Array.from({ length: 7 }, (_, i) => sumarDias(lunes, i));
+    dias = semana;
+  }
+  const desde = aIso(dias[0], "00:00"), hasta = aIso(dias.at(-1), "23:59");
 
   const [res, tar] = await Promise.all([
     api(`/api/calendario?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}${filtroTipo ? `&tipo=${filtroTipo}` : ""}`),
@@ -129,8 +221,10 @@ export async function render(cont) {
     const di = partes(e.inicio).fecha, df = partes(e.fin).fecha;
     for (const d of dias) if (d >= di && d <= df) porDia.get(d).push(e);
   }
-  const nombreMes = primero.toLocaleDateString("es-PE", { month: "long", year: "numeric", timeZone: "UTC" }).replace(/^./, (c) => c.toUpperCase());
-  const hoy = hoyIso();
+  const titulo = vista === "mes"
+    ? new Date(`${mesActual}-15T12:00:00Z`).toLocaleDateString("es-PE", { month: "long", year: "numeric", timeZone: "UTC" }).replace(/^./, (c) => c.toUpperCase())
+    : tituloDia(diaActual);
+  const delDia = vista === "dia" ? (porDia.get(diaActual) || []) : [];
 
   encabezado("Calendario", "Reuniones y tareas de seguimiento",
     html`<button class="btn btn-ghost btn-sm" data-nuevo="tarea"><i class="fas fa-list-check"></i> Tarea</button><button class="btn btn-brand btn-sm" data-nuevo="reunion"><i class="fas fa-plus"></i> Reunión</button>`);
@@ -144,24 +238,31 @@ export async function render(cont) {
             ${g.error ? html`<br><span style="color:var(--danger)"><i class="fas fa-triangle-exclamation"></i> ${g.error}</span>` : ""}</span>`
         : html`<span>Conecta tu Google Calendar para ver aquí tus reuniones y que lo que agendes se refleje allá.</span>`}
       </div>
-      ${g.habilitado && g.conectado ? html`<button class="btn btn-ghost btn-sm" id="sync"><i class="fas fa-rotate"></i> Sincronizar ahora</button><button class="btn btn-ghost btn-sm" id="desconectar">Desconectar</button>` : ""}
+      ${g.habilitado && g.conectado ? html`<button class="btn btn-ghost btn-sm" id="sync"><i class="fas fa-rotate"></i> Sincronizar</button><button class="btn btn-ghost btn-sm" id="desconectar">Desconectar</button>` : ""}
       ${g.habilitado && !g.conectado ? html`<a class="btn btn-brand btn-sm" href="/api/calendario/google/conectar"><i class="fab fa-google"></i> Conectar Google Calendar</a>` : ""}
     </div>
     <div class="cal-layout">
-      <div>
+      <div class="card cal-panel">
         <div class="cal-head">
-          <button class="icon-btn" id="prev" aria-label="Mes anterior"><i class="fas fa-chevron-left"></i></button>
-          <h2>${nombreMes}</h2>
-          <button class="icon-btn" id="next" aria-label="Mes siguiente"><i class="fas fa-chevron-right"></i></button>
-          <button class="btn btn-ghost btn-sm" id="hoy">Hoy</button>
-          <div class="tabs" style="margin-left:auto">${[["", "Todo"], ["reunion", "Reuniones"], ["tarea", "Tareas"]].map(([k, t]) => html`<button class="tab ${filtroTipo === k ? "activo" : ""}" data-tipo="${k}">${t}</button>`)}</div>
+          <div class="cal-nav">
+            <button class="icon-btn" id="prev" aria-label="${vista === "mes" ? "Mes anterior" : "Día anterior"}"><i class="fas fa-chevron-left"></i></button>
+            <button class="icon-btn" id="next" aria-label="${vista === "mes" ? "Mes siguiente" : "Día siguiente"}"><i class="fas fa-chevron-right"></i></button>
+            <button class="btn btn-ghost btn-sm" id="hoy">Hoy</button>
+          </div>
+          <h2>${titulo}</h2>
+          <div class="cal-controles">
+            <input type="date" class="ctrl" id="irFecha" value="${vista === "mes" ? `${mesActual}-01` : diaActual}" aria-label="Ir a una fecha" title="Ir a una fecha">
+            <div class="tabs" role="tablist" aria-label="Vista">${[["mes", "Mes", "fa-calendar"], ["dia", "Día", "fa-calendar-day"]].map(([k, t, ic]) => html`<button class="tab ${vista === k ? "activo" : ""}" data-vista="${k}" role="tab" aria-selected="${vista === k ? "true" : "false"}"><i class="fas ${ic}"></i> ${t}</button>`)}</div>
+            <div class="tabs">${[["", "Todo"], ["reunion", "Reuniones"], ["tarea", "Tareas"]].map(([k, t]) => html`<button class="tab ${filtroTipo === k ? "activo" : ""}" data-tipo="${k}">${t}</button>`)}</div>
+          </div>
         </div>
-        <div class="mes">
-          ${DIAS.map((d) => html`<div class="dsem">${d}</div>`)}
-          ${dias.map((d) => html`<div class="dia ${d.slice(0, 7) !== mesActual ? "fuera" : ""} ${d === hoy ? "hoy" : ""}" data-dia="${d}"><span class="num">${Number(d.slice(8))}</span>${celdaEventos(porDia.get(d))}</div>`)}
-        </div>
+        <div class="cal-cuerpo">${vista === "mes" ? vistaMes(dias, porDia, hoy) : vistaDia(semana, porDia, hoy)}</div>
+        <div class="cal-leyenda"><span><i class="cuadro reunion"></i>Reunión</span><span><i class="cuadro tarea"></i>Tarea</span><span><i class="fab fa-google"></i> Sincronizado con Google</span>
+          <span class="muted">${vista === "mes" ? "Clic en un número para ver el día · clic en un espacio vacío para agendar" : "Clic en una hora para agendar"}</span></div>
       </div>
-      <aside>
+      <aside class="grid" style="align-content:start">
+        ${vista === "dia" ? html`<div class="card"><div class="card-head"><h3>Agenda del día</h3><span class="sub">${delDia.length}</span></div>
+          <div class="card-body">${delDia.length ? html`<ul class="agenda-dia">${delDia.map((e) => html`<li class="${claseEv(e)}" data-ev="${e.id}"><span class="hh">${e.todo_el_dia ? "Todo el día" : `${hhmm(e.inicio)} – ${hhmm(e.fin)}`}</span><strong>${e.titulo}</strong>${e.meet_link && urlSegura(e.meet_link) ? html`<a href="${urlSegura(e.meet_link)}" target="_blank" rel="noopener noreferrer" class="meet"><i class="fas fa-video"></i> Unirse</a>` : ""}</li>`)}</ul>` : html`<p class="muted">Día libre.</p>`}</div></div>` : ""}
         <div class="card"><div class="card-head"><h3>Mis tareas abiertas</h3><span class="sub">${tareas.length}</span></div>
           <div class="card-body">${tareas.length ? html`<ul class="lista-tareas">${tareas.map((t) => html`
             <li><input type="checkbox" data-hecha="${t.id}" aria-label="Marcar como hecha">
@@ -173,12 +274,23 @@ export async function render(cont) {
     </div>`);
 
   const recargar = () => render(cont);
-  const mover = (n) => { const d = new Date(Date.UTC(a, m - 1 + n, 1)); mesActual = d.toISOString().slice(0, 7); recargar(); };
+  const mover = (n) => {
+    if (vista === "mes") { const [a, m] = mesActual.split("-").map(Number); mesActual = new Date(Date.UTC(a, m - 1 + n, 1)).toISOString().slice(0, 7); }
+    else { diaActual = sumarDias(diaActual, n); mesActual = diaActual.slice(0, 7); }
+    recargar();
+  };
+  const verDia = (d) => { vista = "dia"; diaActual = d; mesActual = d.slice(0, 7); recargar(); };
   $("#prev", cont).addEventListener("click", () => mover(-1));
   $("#next", cont).addEventListener("click", () => mover(1));
-  $("#hoy", cont).addEventListener("click", () => { mesActual = hoyIso().slice(0, 7); recargar(); });
+  $("#hoy", cont).addEventListener("click", () => { diaActual = hoyIso(); mesActual = diaActual.slice(0, 7); recargar(); });
+  $("#irFecha", cont).addEventListener("change", (e) => { if (!e.target.value) return; if (vista === "mes") { mesActual = e.target.value.slice(0, 7); recargar(); } else verDia(e.target.value); });
+  $$("[data-vista]", cont).forEach((b) => b.addEventListener("click", () => {
+    vista = b.dataset.vista;
+    if (vista === "dia" && diaActual.slice(0, 7) !== mesActual) diaActual = mesActual === hoyIso().slice(0, 7) ? hoyIso() : `${mesActual}-01`;
+    recargar();
+  }));
   $$("[data-tipo]", cont).forEach((b) => b.addEventListener("click", () => { filtroTipo = b.dataset.tipo; recargar(); }));
-  $$("#accionesVista [data-nuevo]").forEach((b) => b.addEventListener("click", () => editorEvento({ tipo: b.dataset.nuevo }, recargar)));
+  $$("#accionesVista [data-nuevo]").forEach((b) => b.addEventListener("click", () => editorEvento({ tipo: b.dataset.nuevo, fecha: vista === "dia" ? diaActual : undefined }, recargar)));
   $("#sync", cont)?.addEventListener("click", async (e) => {
     e.currentTarget.disabled = true;
     const r = await api("/api/calendario/sincronizar", { method: "POST" });
@@ -191,15 +303,24 @@ export async function render(cont) {
   });
 
   cont.onclick = async (ev) => {
+    if (ev.target.closest("a")) return;
     const evEl = ev.target.closest("[data-ev]");
     if (evEl) {
       ev.stopPropagation();
       const e = [...eventos, ...tareas].find((x) => x.id === evEl.dataset.ev);
-      if (!e) return;
-      return editorEvento(e, recargar);
+      if (e) editorEvento(e, recargar);
+      return;
     }
+    const ver = ev.target.closest("[data-ver-dia]");
+    if (ver) return verDia(ver.dataset.verDia);
+    const fila = ev.target.closest("[data-hora]");
+    if (fila) return editorEvento({ tipo: filtroTipo || "reunion", fecha: diaActual, hora: fila.dataset.hora }, recargar);
     const dia = ev.target.closest("[data-dia]");
-    if (dia) editorEvento({ tipo: filtroTipo || "reunion", fecha: dia.dataset.dia }, recargar);
+    if (dia) {
+      // En celular el mes es compacto: tocar el día abre la vista del día
+      if (window.matchMedia("(max-width: 760px)").matches) return verDia(dia.dataset.dia);
+      editorEvento({ tipo: filtroTipo || "reunion", fecha: dia.dataset.dia }, recargar);
+    }
   };
   cont.onchange = async (ev) => {
     const chk = ev.target.closest("[data-hecha]");
@@ -207,6 +328,14 @@ export async function render(cont) {
     const r = await api(`/api/calendario/${chk.dataset.hecha}/estado`, { method: "PATCH", body: { estado: "hecha" } });
     if (r.ok) { toast("Tarea completada"); recargar(); } else { chk.checked = false; toast(r.data.mensaje, "error"); }
   };
+
+  // Al abrir la vista del día de hoy, se centra en la hora actual
+  if (vista === "dia") {
+    const caja = cont.querySelector(".tiempo-scroll");
+    // Se posiciona en el primer evento del día (o en la hora actual), dejando una hora de margen arriba
+    const tops = $$(".bloque, .ahora", cont).map((x) => x.offsetTop);
+    if (caja) caja.scrollTop = tops.length ? Math.max(0, Math.min(...tops) - ALTO_HORA) : ALTO_HORA; // por defecto desde las 08:00
+  }
 
   // Sincronización silenciosa al abrir el calendario (trae los cambios hechos en Google)
   if (g.conectado && (!g.ultimaSync || Date.now() - new Date(g.ultimaSync) > 60000) && !cont.dataset.sincronizando) {

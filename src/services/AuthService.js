@@ -4,7 +4,7 @@
 // =====================================================================
 const argon2 = require("argon2");
 const jwt = require("jsonwebtoken");
-const { JWT_SECRET, DOMINIOS_PERMITIDOS } = require("../config/env");
+const { JWT_SECRET, DOMINIOS_PERMITIDOS, CORREOS_PERMITIDOS } = require("../config/env");
 const { ARGON2_OPTIONS, JWT_OPTIONS, LOGIN_POLICY } = require("../config/security");
 const { HttpError } = require("../utils/HttpError");
 const cacheSesion = require("../utils/cacheSesion");
@@ -25,7 +25,8 @@ class AuthService {
    */
   async registrar({ nombres, apellidos, email, cargo, password }, ip) {
     const dominio = email.split("@")[1];
-    if (DOMINIOS_PERMITIDOS.length && !DOMINIOS_PERMITIDOS.includes(dominio)) {
+    const excepcion = CORREOS_PERMITIDOS.includes(email.toLowerCase());
+    if (DOMINIOS_PERMITIDOS.length && !DOMINIOS_PERMITIDOS.includes(dominio) && !excepcion) {
       throw new HttpError(400, "No se pudo crear la cuenta", { email: `Solo se permiten correos corporativos (${DOMINIOS_PERMITIDOS.map((d) => "@" + d).join(", ")})` });
     }
     const primero = (await this.usuarios.contar()) === 0;

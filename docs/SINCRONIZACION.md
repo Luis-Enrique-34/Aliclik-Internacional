@@ -1,5 +1,7 @@
 # Cómo mantener el tablero actualizado con los pedidos de Aurora
 
+> Aliclik Internacional usa **solo la base Aurora**. Procedimiento paso a paso: [ACTUALIZACION-DIARIA.md](ACTUALIZACION-DIARIA.md).
+
 El tablero lee la tabla `pedidos` de Supabase. Esa tabla se llena desde Aurora (MySQL) con el query [`database/aurora/pedidos_internacional.sql`](../database/aurora/pedidos_internacional.sql), que devuelve **una fila por pedido** fuera de Perú con su tienda, proveedor principal, almacén, courier y estados.
 
 Cada carga hace **UPSERT por `order_id`**: los pedidos nuevos se agregan, los existentes se actualizan (por ejemplo, de "Despachado" a "Entregado") y nunca se duplican. Por eso el query trae los **últimos 45 días** y no solo los de hoy: así los pedidos anteriores también actualizan su estado.
@@ -51,6 +53,18 @@ Ejecuta `scripts/sync-aurora.js` desde un servicio que tenga red hacia Aurora, c
 - Un servidor/VM interno con `cron`.
 
 Vercel no suele tener acceso a la VPC de Aurora, por eso no se recomienda correr la sincronización allí.
+
+## Refrescar los pedidos que ya están cargados
+
+La carga diaria trae los últimos 45 días. Si necesitas actualizar el estado de **todos** los pedidos que ya están en la plataforma (por ejemplo, pedidos antiguos que se entregaron o devolvieron después):
+
+1. En Supabase → SQL Editor: `SELECT min(fecha_pedido)::date FROM pedidos;` (ver `database/consultas_supabase.sql`).
+2. Opción CSV: abre `database/aurora/actualizar_pedidos_cargados.sql`, pon esa fecha en `@desde`, ejecútalo, exporta a CSV y súbelo en *Cargas de datos*.
+3. Opción directa: `npm run sync:aurora -- --desde 2026-01-01` (con la fecha del paso 1).
+
+Los pedidos sin cambios no se reescriben; solo se actualizan los que cambiaron.
+
+Para ver qué tiendas ya operan fuera de Perú: `database/aurora/tiendas_operando.sql` (en Aurora) o la consulta 2 de `database/consultas_supabase.sql` (lo que ya está en la plataforma).
 
 ## Supuestos del query para validar con backend
 

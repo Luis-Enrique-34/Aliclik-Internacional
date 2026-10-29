@@ -35,7 +35,7 @@ export async function render(cont) {
     ${filtroEntidad ? html`<div class="aviso info"><i class="fas fa-filter"></i><div>Filtrando por <b>${ETIQ[filtroEntidad]}: ${nombreEntidad || f[filtroEntidad]}</b> (ID ${f[filtroEntidad]}). <a href="#/pedidos?${qs({ ...f, [filtroEntidad]: "", pagina: "" })}">Quitar filtro</a></div></div>` : ""}
     <div class="card">
       ${datos.filas.length ? html`
-      <div class="tabla-wrap"><table class="tabla">
+      <div class="tabla-wrap"><table class="tabla t-pedidos">
         <thead><tr><th>Pedido</th><th>Fecha</th><th>País</th><th>Tienda</th><th>Proveedor</th><th>Almacén</th><th>Courier</th><th>Estado</th><th class="num">Total</th></tr></thead>
         <tbody>${datos.filas.map((p, i) => html`
           <tr class="clic" data-i="${i}">

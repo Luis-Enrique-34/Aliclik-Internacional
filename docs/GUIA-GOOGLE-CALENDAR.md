@@ -34,6 +34,20 @@ Cada usuario conecta **su propio** Google Calendar desde *Calendario → Conecta
    ```
 6. Reinicia (`npm run dev`). En la terminal verás: `📅 Google Calendar habilitado`.
 
+## Caso: conectar una cuenta Gmail personal (ej. la cuenta de desarrollo)
+
+Si el correo con el que te registraste es un Gmail (no Google Workspace):
+
+1. En Google Cloud crea el proyecto **con esa misma cuenta Gmail** (o agrégala como propietaria del proyecto).
+2. Pantalla de consentimiento → tipo **Externo** (con Gmail no existe "Interno").
+3. Sección **Usuarios de prueba** → *Add users* → escribe el Gmail. Mientras la app esté "En prueba", **solo** esos correos pueden conectarse (máx. 100) y no hace falta verificar la app.
+4. Crea el ID de cliente web con la URI `http://localhost:3000/api/calendario/google/callback` (si usas otro puerto, cámbialo aquí y en `APP_URL`).
+5. Pega `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` en `.env` y reinicia `npm run dev`.
+6. En la plataforma: **Calendario → Conectar Google Calendar**. Google mostrará "Google no verificó esta app": pulsa *Continuar* (es tu propia app en modo prueba) y acepta el permiso de eventos.
+7. Desde ese momento tus reuniones aparecen en la vista **Mes** y **Día**, y lo que crees aquí aparece en tu Google Calendar (con Meet si marcas la opción).
+
+> En modo prueba Google pide reconectar cada 7 días. Para evitarlo, en la pantalla de consentimiento pulsa **Publicar app** (para uso interno no requiere verificación mientras solo uses el permiso de eventos y pocos usuarios; Google mostrará la advertencia de app no verificada).
+
 ## Aviso en tiempo real (webhook)
 
 Google solo envía avisos a una URL pública **https**. En Vercel se activa solo (`APP_URL=https://…`). En tu equipo local se usa la sincronización periódica, que es suficiente para el día a día.

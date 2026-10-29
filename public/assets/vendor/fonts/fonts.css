@@ -1,9 +1,5 @@
-/* Fuentes locales (Montserrat y Open Sans, licencia OFL) — funcionan sin internet */
-@font-face{font-family:'Montserrat';font-style:normal;font-weight:400;font-display:swap;src:url(montserrat-latin-400-normal.woff2) format('woff2')}
-@font-face{font-family:'Montserrat';font-style:normal;font-weight:600;font-display:swap;src:url(montserrat-latin-600-normal.woff2) format('woff2')}
-@font-face{font-family:'Montserrat';font-style:normal;font-weight:700;font-display:swap;src:url(montserrat-latin-700-normal.woff2) format('woff2')}
-@font-face{font-family:'Montserrat';font-style:normal;font-weight:800;font-display:swap;src:url(montserrat-latin-800-normal.woff2) format('woff2')}
-@font-face{font-family:'Open Sans';font-style:normal;font-weight:300;font-display:swap;src:url(open-sans-latin-300-normal.woff2) format('woff2')}
-@font-face{font-family:'Open Sans';font-style:normal;font-weight:400;font-display:swap;src:url(open-sans-latin-400-normal.woff2) format('woff2')}
-@font-face{font-family:'Open Sans';font-style:normal;font-weight:600;font-display:swap;src:url(open-sans-latin-600-normal.woff2) format('woff2')}
-@font-face{font-family:'Open Sans';font-style:normal;font-weight:700;font-display:swap;src:url(open-sans-latin-700-normal.woff2) format('woff2')}
+/* Fuentes locales (licencia SIL OFL): funcionan sin internet y respetan la CSP.
+   Inter → textos y números (cifras tabulares, muy legible en tablas)
+   Plus Jakarta Sans → títulos (geométrica y moderna)                  */
+@font-face{font-family:'Inter';font-style:normal;font-weight:100 900;font-display:swap;src:url(inter-latin-wght.woff2) format('woff2-variations'),url(inter-latin-wght.woff2) format('woff2')}
+@font-face{font-family:'Plus Jakarta Sans';font-style:normal;font-weight:200 800;font-display:swap;src:url(plus-jakarta-sans-latin-wght.woff2) format('woff2-variations'),url(plus-jakarta-sans-latin-wght.woff2) format('woff2')}

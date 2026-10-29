@@ -150,3 +150,20 @@ t("Bloqueo de cuenta tras 5 intentos fallidos", async () => {
   const r = await pedir("/api/auth/login", { method: "POST", body: { email, password: PASS } });
   assert.equal(r.status, 423);
 });
+
+t("Registro: dominio corporativo obligatorio salvo correos de excepción", async () => {
+  const env = require("../../src/config/env");
+  const antes = { d: env.DOMINIOS_PERMITIDOS.slice(), c: env.CORREOS_PERMITIDOS.slice() };
+  env.DOMINIOS_PERMITIDOS.splice(0, Infinity, "aliclik.app");
+  env.CORREOS_PERMITIDOS.splice(0, Infinity, `dev.${sufijo}@gmail.com`);
+  const registrar = (email) => pedir("/api/auth/registro", { method: "POST", body: { nombres: "Prueba", apellidos: "Dominio", email, password: PASS, confirmPassword: PASS, aceptaPoliticas: true } });
+  try {
+    assert.equal((await registrar(`otro.${sufijo}@gmail.com`)).status, 400, "gmail cualquiera: rechazado");
+    assert.equal((await registrar(`DEV.${sufijo}@Gmail.com`)).status, 201, "correo de excepción: aceptado (sin importar mayúsculas)");
+    assert.equal((await registrar(`corp.${sufijo}@aliclik.app`)).status, 201, "corporativo: aceptado");
+  } finally {
+    env.DOMINIOS_PERMITIDOS.splice(0, Infinity, ...antes.d);
+    env.CORREOS_PERMITIDOS.splice(0, Infinity, ...antes.c);
+    await db.query("DELETE FROM usuarios WHERE email IN ($1, $2)", [`dev.${sufijo}@gmail.com`, `corp.${sufijo}@aliclik.app`]);
+  }
+});

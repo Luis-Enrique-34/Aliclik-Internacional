@@ -69,7 +69,7 @@ export async function render(cont) {
       <button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button>
     </form>
     <div class="card">${lista.length ? html`
-      <div class="tabla-wrap"><table class="tabla">
+      <div class="tabla-wrap"><table class="tabla t-observaciones">
         <thead><tr><th>#</th><th>Descripción</th><th>Módulo</th><th>País</th><th>Prioridad</th><th>Estado</th><th>Responsable</th><th class="num">Comentarios</th><th>Actualizada</th></tr></thead>
         <tbody>${lista.map((o, i) => html`
           <tr class="clic" data-i="${i}">

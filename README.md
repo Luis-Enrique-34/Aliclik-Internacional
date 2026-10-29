@@ -11,16 +11,16 @@ Plataforma interna del área de Sistemas para **monitorear los pedidos de la ope
 | **Integraciones** | La hoja "Proov Bodega" del Excel: cada proveedor + almacén por país, con su checklist (WhatsApp, sistemas, capacitación, catálogo, despacho, liquidaciones), avance y bitácora de seguimiento. |
 | **Seguimiento** | Un módulo por **tiendas, proveedores, almacenes y couriers**: salud del volumen (en crecimiento, estable, en caída, inactiva), meta de pedidos del mes con proyección, alertas, ficha 360 con tendencia de 12 meses, contrapartes, reuniones y bitácora. Incluye el **trato especial**: segmento (Preferente, VIP, Estratégica), condiciones y **acuerdos** (descuentos exclusivos, tarifas, beneficios) que pueden ganarse por **escalas de pedidos**. Ver [docs/SEGUIMIENTO.md](docs/SEGUIMIENTO.md). |
 | **Observaciones** | Hallazgos de la plataforma (hoja "Observaciones") con prioridad, responsable y comentarios. |
-| **Calendario** | Reuniones y tareas, vinculadas a integraciones. **Sincronización en ambos sentidos con Google Calendar** (incluye enlace de Meet e invitaciones). |
+| **Calendario** | Reuniones y tareas, vinculadas a integraciones. Vista **Mes** (por defecto) y vista **Día** con línea de tiempo por hora. **Sincronización en ambos sentidos con Google Calendar** (incluye enlace de Meet e invitaciones). |
 | **Cargas de datos** | Subir el CSV diario del query de Aurora, historial de cargas y clasificación de estados. |
 | **Usuarios / Auditoría** | Aprobación de cuentas, roles (admin, editor, lector) y registro de acciones de seguridad. |
 
 ## Tecnologías
 
-- **Frontend:** HTML, CSS y JavaScript (módulos ES, sin frameworks) · colores de Aliclik · tema claro/oscuro · responsive
+- **Frontend:** HTML, CSS y JavaScript (módulos ES, sin frameworks) · colores de Aliclik en paleta de bajo contraste (neutros + azul solo para acciones) · tema claro/oscuro · responsive (móvil, tablet, escritorio) · tipografías Inter y Plus Jakarta Sans (servidas localmente, sin Google Fonts)
 - **Backend:** Node.js 20+ y Express 5 con arquitectura **MVC + Servicio + DAO** (igual que Command-Service)
 - **Base de datos:** PostgreSQL en **Supabase** (usuarios y accesos incluidos) con RLS en todas las tablas
-- **Fuente de datos:** Aurora (MySQL), por CSV o sincronización directa de solo lectura
+- **Fuente de datos:** únicamente **Aurora** (MySQL 8), por CSV o sincronización directa de solo lectura (`npm run sync:aurora`). Procedimiento: [docs/ACTUALIZACION-DIARIA.md](docs/ACTUALIZACION-DIARIA.md)
 - **Seguridad:** Argon2id, sesión JWT en cookie HttpOnly/SameSite=Strict revocable, Zod, Helmet (CSP estricta), CSRF por origen, límites de peticiones, bloqueo de cuenta, tokens de Google cifrados con AES-256-GCM, auditoría. Detalle en [docs/INFORME-SEGURIDAD.md](docs/INFORME-SEGURIDAD.md).
 
 ## Inicio rápido (Windows · PowerShell)

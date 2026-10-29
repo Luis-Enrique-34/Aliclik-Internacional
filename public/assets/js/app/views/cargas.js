@@ -73,8 +73,8 @@ export async function render(cont, _ctx, mantenerForzar = false) {
         <div class="card"><div class="card-head"><h3>¿Cómo actualizar los datos?</h3></div>
           <div class="card-body">
             <ol class="pasos">
-              <li><div>Abre <b>DBeaver o MySQL Workbench</b> con tu usuario de solo lectura de Aurora.</div></li>
-              <li><div>Ejecuta el query <code>database/aurora/pedidos_internacional.sql</code> (trae los últimos 45 días de pedidos fuera de Perú).</div></li>
+              <li><div>Abre <b>DBeaver o MySQL Workbench</b> con tu usuario de solo lectura de <b>Aurora</b>.</div></li>
+              <li><div>Ejecuta <code>database/aurora/pedidos_internacional.sql</code> (tiendas registradas fuera de Perú, pedidos desde 2026-10-01, últimos 45 días). Para refrescar todo lo ya cargado usa <code>database/aurora/actualizar_pedidos_cargados.sql</code>.</div></li>
               <li><div>Exporta el resultado a <b>CSV (UTF-8, con encabezados)</b>.</div></li>
               <li><div>Súbelo aquí. Los estados nuevos se clasifican solos; revísalos abajo.</div></li>
             </ol>
@@ -83,7 +83,7 @@ export async function render(cont, _ctx, mantenerForzar = false) {
 
         <div class="card mt"><div class="card-head"><h3>Estados de pedido</h3><span class="sub">Cómo se agrupan en el tablero</span></div>
           ${estados.length ? html`<div class="tabla-wrap"><table class="tabla">
-            <thead><tr><th>Estado en Aurora</th><th class="num">Pedidos</th><th>Grupo</th></tr></thead>
+            <thead><tr><th>Estado de origen</th><th class="num">Pedidos</th><th>Grupo</th></tr></thead>
             <tbody>${estados.map((e) => html`<tr>
               <td><div class="nombre">${e.estado_label || e.estado_codigo}</div><div class="muted" style="font-size:11.5px">${e.estado_codigo}${e.manual ? " · ajustado a mano" : ""}</div></td>
               <td class="num">${numero(e.pedidos)}</td>

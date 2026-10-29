@@ -67,6 +67,8 @@ module.exports = {
   ENCRYPTION_KEY: Buffer.from(process.env.ENCRYPTION_KEY, "hex"),
   // Solo estos dominios pueden registrarse (vacío = cualquiera, igual requiere aprobación)
   DOMINIOS_PERMITIDOS: lista(process.env.ALLOWED_EMAIL_DOMAINS),
+  // Excepciones: correos exactos que pueden registrarse aunque no sean del dominio corporativo
+  CORREOS_PERMITIDOS: lista(process.env.ALLOWED_EMAILS),
   CRON_SECRET: process.env.CRON_SECRET || "",
   SYNC_INTERVAL_MIN: Math.max(1, Number(process.env.CALENDAR_SYNC_MINUTES) || 5),
   ZONA_HORARIA: process.env.APP_TIMEZONE || "America/Lima",

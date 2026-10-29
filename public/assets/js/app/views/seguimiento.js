@@ -174,7 +174,7 @@ async function renderLista(cont, tipo, h) {
           <button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button>
         </form>
         <div class="card">${filas.length ? html`
-          <div class="tabla-wrap"><table class="tabla">
+          <div class="tabla-wrap"><table class="tabla t-seguimiento">
             <thead><tr><th>${TIPO_UNO[tipo]}</th><th>Salud</th><th>Pedidos del mes</th><th class="num">30 días</th><th class="num">Efectividad</th><th class="num">Dev./canc.</th><th>Último pedido</th><th>Beneficios</th></tr></thead>
             <tbody>${filas.map((e) => html`
               <tr class="clic" data-id="${e.id}">

@@ -1,8 +1,9 @@
 -- =====================================================================
 --  ALICLIK INTERNACIONAL · Extracción de pedidos desde AURORA (MySQL 8)
 --
---  Devuelve UNA FILA POR PEDIDO de países distintos a Perú, con su tienda,
---  proveedor principal, almacén, courier y estados. Las columnas tienen
+--  Devuelve UNA FILA POR PEDIDO de las tiendas registradas fuera de Perú
+--  (stores.country_id <> 1) creados desde @inicio, con su tienda, proveedor
+--  principal, almacén, courier y estados. Las columnas tienen
 --  exactamente los nombres que espera la plataforma (Cargas → Subir CSV).
 --
 --  CÓMO USARLO (manual, una vez al día):
@@ -25,15 +26,19 @@
 --   ⚠ El país del pedido es el de destino; si viene vacío, el de la tienda.
 -- =====================================================================
 
-SET @dias  = 45;
-SET @desde = DATE_SUB(UTC_TIMESTAMP(), INTERVAL @dias DAY);
+SET @dias   = 45;                          -- ventana móvil (se refrescan estados recientes)
+SET @inicio = '2026-10-01 00:00:00';       -- nunca trae pedidos anteriores a esta fecha
+SET @desde  = GREATEST(DATE_SUB(UTC_TIMESTAMP(), INTERVAL @dias DAY), CAST(@inicio AS DATETIME));
 
 -- ====== CONSULTA ======
-WITH pedidos_ventana AS (
+WITH pedidos_ventana AS (                    -- pedidos de tiendas registradas fuera de Perú
     SELECT o.id
       FROM orders o
-     WHERE (o.created_at >= @desde OR o.updated_at >= @desde)
+      JOIN stores st ON st.id = o.store_id
+     WHERE o.created_at >= @inicio                              -- solo pedidos creados desde @inicio
+       AND (o.created_at >= @desde OR o.updated_at >= @desde)     -- ...y nuevos o con cambios en la ventana
        AND COALESCE(o.is_disabled_order, 0) = 0
+       AND st.country_id <> 1                   -- countries.id = 1 es Perú
 ),
 lineas AS (                                  -- importe y unidades por pedido y proveedor
     SELECT od.order_id,
@@ -93,6 +98,5 @@ SELECT
   LEFT JOIN order_statuses os      ON os.id = o.status_id
   LEFT JOIN shipping_statuses ss   ON ss.id = o.shipping_status_id
   LEFT JOIN ultima_entrega ue      ON ue.order_id = o.id
- WHERE c.iso_code IS NOT NULL
-   AND UPPER(c.iso_code) NOT IN ('PE', 'PER')      -- solo operación internacional
+ WHERE s.country_id <> 1                          -- solo tiendas del extranjero (1 = Perú)
  ORDER BY o.created_at DESC;

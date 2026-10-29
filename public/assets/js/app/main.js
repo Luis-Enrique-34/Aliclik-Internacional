@@ -39,7 +39,7 @@ async function enrutar() {
   const vista = permitidas().find((v) => v.ruta === ruta && v.modulo);
   if (!vista) { location.replace("#/inicio"); return; }
   document.querySelectorAll(".nav-item").forEach((a) => a.classList.toggle("activo", a.dataset.ruta === ruta));
-  $("#sidebar").classList.remove("abierto");
+  menu(false);
   const cont = $("#vista");
   const mio = ++navegacion;
   cont.onclick = null;
@@ -81,7 +81,14 @@ $("#logoutBtn").addEventListener("click", async () => {
   await api("/api/auth/logout", { method: "POST" });
   location.replace("login.html?salir=1");
 });
-$("#menuBtn").addEventListener("click", () => $("#sidebar").classList.toggle("abierto"));
+/** Abre/cierra el menú lateral en tablet y celular (con fondo oscuro detrás). */
+function menu(abrir) {
+  $("#sidebar").classList.toggle("abierto", abrir);
+  $("#velo").classList.toggle("visible", abrir);
+}
+$("#menuBtn").addEventListener("click", () => menu(!$("#sidebar").classList.contains("abierto")));
+$("#velo").addEventListener("click", () => menu(false));
+document.addEventListener("keydown", (e) => e.key === "Escape" && menu(false));
 document.addEventListener("click", (e) => {
-  if (window.innerWidth <= 900 && !e.target.closest("#sidebar, #menuBtn")) $("#sidebar").classList.remove("abierto");
+  if (window.innerWidth <= 1024 && e.target.closest(".nav-item")) menu(false);
 });

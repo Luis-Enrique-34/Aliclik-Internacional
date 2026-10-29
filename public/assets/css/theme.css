@@ -3,96 +3,115 @@
    Azul eléctrico #2B26FF + turquesa #07F3DF del isotipo.
    Tema claro por defecto (igual que la plataforma Aliclik) y oscuro opcional.
    ===================================================================== */
+/* ---------------------------------------------------------------------
+   Relación de colores (cómo se usa cada tono):
+   · Neutros fríos (≈90 % de la pantalla): fondos, tarjetas, bordes y texto.
+     Bajo contraste entre superficies para que la vista descanse.
+   · Azul Aliclik (≈8 %): SOLO acciones principales, selección y foco.
+   · Turquesa (≈2 %): un acento de marca (indicador del menú activo).
+   · Semánticos (verde/ámbar/rojo/azul info): SOLO para estados y alertas,
+     siempre con texto o ícono, nunca como decoración.
+   · Series de gráficos: tres tonos validados para daltonismo y contraste.
+   --------------------------------------------------------------------- */
 :root,
 [data-theme="light"] {
   color-scheme: light;
-  --brand: #2b26ff;
-  --brand-hover: #1f1ae0;
-  --brand-soft: rgba(43, 38, 255, 0.08);
-  --brand-border: rgba(43, 38, 255, 0.28);
-  --brand-text: #2b26ff;
+  /* Escala de marca */
+  --brand-50: #eef0ff;
+  --brand-100: #e1e4ff;
+  --brand-200: #c5caff;
+  --brand-600: #2b26ff;
+  --brand-700: #1f1ad6;
+  --brand: var(--brand-600);
+  --brand-hover: var(--brand-700);
+  --brand-soft: var(--brand-50);
+  --brand-border: var(--brand-200);
+  --brand-text: #2620e0;
   --accent: #07f3df;
   --on-brand: #ffffff;
 
-  --bg: #f4f5fb;
+  /* Neutros fríos (gris pizarra con un toque azul) */
+  --bg: #f4f5f8;
   --surface: #ffffff;
-  --surface-2: #f7f8fc;
-  --surface-3: #eef0f8;
-  --overlay: rgba(12, 13, 40, 0.45);
+  --surface-2: #f8f9fb;
+  --surface-3: #eef0f4;
+  --overlay: rgba(16, 19, 36, 0.42);
 
-  --sidebar: #0d0b45;
-  --sidebar-2: #17146b;
-  --sidebar-text: #c9c8f5;
+  --sidebar: #151829;
+  --sidebar-2: #222743;
+  --sidebar-text: #b9bdd3;
 
-  --text: #15163a;
-  --text-2: #4a4c6b;
-  --text-3: #6f7191;
-  --border: #e3e5f0;
-  --border-strong: #cfd2e3;
-  --placeholder: #9a9cb5;
+  --text: #171a2b;
+  --text-2: #4b5167;
+  --text-3: #6b7289;
+  --border: #e4e7ee;
+  --border-strong: #ced3df;
+  --placeholder: #9aa1b4;
 
-  --ok: #0f7a4d;      --ok-soft: rgba(16, 156, 98, 0.11);
-  --warn: #8a5a00;    --warn-soft: rgba(230, 160, 20, 0.15);
-  --danger: #c0262d;  --danger-soft: rgba(220, 38, 38, 0.09);
-  --info: #1f5fd1;    --info-soft: rgba(37, 99, 235, 0.1);
-  --muted-soft: rgba(110, 112, 140, 0.12);
+  /* Estados */
+  --ok: #0c7d55;      --ok-soft: #e5f5ee;
+  --warn: #965a00;    --warn-soft: #fdf2dc;
+  --danger: #c2333a;  --danger-soft: #fdecec;
+  --info: #1f5bc4;    --info-soft: #e8f0fd;
+  --muted-soft: #eef0f4;
 
   /* Gráficos (validados para daltonismo y contraste) */
   --serie-1: #2b26ff;
   --serie-2: #0e9f8f;
   --serie-3: #d9702a;
-  --grid: #e9ebf3;
+  --grid: #eceef3;
 
-  --shadow-sm: 0 1px 2px rgba(20, 22, 60, 0.06), 0 1px 3px rgba(20, 22, 60, 0.05);
-  --shadow-md: 0 8px 24px rgba(20, 22, 60, 0.08);
-  --shadow-lg: 0 24px 60px rgba(20, 22, 60, 0.18);
+  --shadow-sm: 0 1px 2px rgba(23, 26, 43, 0.05);
+  --shadow-md: 0 6px 20px rgba(23, 26, 43, 0.07);
+  --shadow-lg: 0 20px 50px rgba(23, 26, 43, 0.16);
   --radius: 12px;
   --radius-sm: 8px;
 
-  --font-heading: "Montserrat", system-ui, sans-serif;
-  --font-body: "Open Sans", system-ui, sans-serif;
+  --font-heading: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --brand: #6763ff;
-  --brand-hover: #7e7aff;
-  --brand-soft: rgba(103, 99, 255, 0.16);
-  --brand-border: rgba(125, 121, 255, 0.4);
-  --brand-text: #9d9aff;
+  --brand-50: #1e2040;
+  --brand-100: #262a52;
+  --brand-200: #3b3f7a;
+  --brand-600: #6d69ff;
+  --brand-700: #8581ff;
+  --brand-text: #a9a6ff;
   --on-brand: #ffffff;
 
-  --bg: #0b0d22;
-  --surface: #151a33;
-  --surface-2: #1b2140;
-  --surface-3: #232a4d;
+  --bg: #0f111a;
+  --surface: #171a26;
+  --surface-2: #1c2030;
+  --surface-3: #242a3c;
   --overlay: rgba(0, 0, 0, 0.6);
 
-  --sidebar: #080a1d;
-  --sidebar-2: #14183a;
-  --sidebar-text: #aeb1d6;
+  --sidebar: #0b0d15;
+  --sidebar-2: #1b1f33;
+  --sidebar-text: #a3a8c0;
 
-  --text: #eceefb;
-  --text-2: #b3b6d3;
-  --text-3: #8c8fb0;
-  --border: #262c4f;
-  --border-strong: #353c66;
-  --placeholder: #6b6f92;
+  --text: #e7e9f2;
+  --text-2: #b0b5c9;
+  --text-3: #868ca4;
+  --border: #262b3d;
+  --border-strong: #353b52;
+  --placeholder: #666c86;
 
-  --ok: #4ade9b;      --ok-soft: rgba(74, 222, 155, 0.12);
-  --warn: #f5c451;    --warn-soft: rgba(245, 196, 81, 0.13);
-  --danger: #ff7a7f;  --danger-soft: rgba(255, 122, 127, 0.12);
-  --info: #79a8ff;    --info-soft: rgba(121, 168, 255, 0.13);
-  --muted-soft: rgba(160, 165, 210, 0.12);
+  --ok: #43d39a;      --ok-soft: rgba(67, 211, 154, 0.12);
+  --warn: #f0be55;    --warn-soft: rgba(240, 190, 85, 0.12);
+  --danger: #ff7d84;  --danger-soft: rgba(255, 125, 132, 0.12);
+  --info: #7aa7ff;    --info-soft: rgba(122, 167, 255, 0.12);
+  --muted-soft: #242a3c;
 
   --serie-1: #7d79ff;
   --serie-2: #0fa596;
   --serie-3: #d47233;
-  --grid: #232a4d;
+  --grid: #232838;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.6);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 6px 20px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.55);
 }
 
 html.tema-anim *, html.tema-anim *::before, html.tema-anim *::after {
@@ -106,12 +125,14 @@ html, body { margin: 0; }
 body {
   font-family: var(--font-body);
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.55;
+  font-feature-settings: "cv11", "ss01";  /* Inter: dígitos y letras más claros */
   color: var(--text);
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
 }
-h1, h2, h3, h4 { font-family: var(--font-heading); margin: 0; line-height: 1.25; color: var(--text); }
+h1, h2, h3, h4 { font-family: var(--font-heading); margin: 0; line-height: 1.25; color: var(--text); letter-spacing: -0.01em; font-weight: 700; }
+.num, .tabla td.num, .kpi .valor, .chart text { font-variant-numeric: tabular-nums; }
 a { color: var(--brand-text); text-decoration: none; }
 a:hover { text-decoration: underline; }
 button, input, select, textarea { font: inherit; color: inherit; }
