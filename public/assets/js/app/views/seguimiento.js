@@ -10,6 +10,7 @@ import {
   vacio, modal, confirmar, resultado, datosForm, puede, pais, TIPOS, TIPO_UNO,
 } from "../core.js";
 import { graficoBarras } from "../charts.js";
+import { panelIndicadores, selectorOrden, ordenar } from "../indicadores.js";
 import { bitacora } from "./_seguimiento.js";
 import { editorEvento } from "./calendario.js";
 
@@ -28,6 +29,15 @@ const VIGENCIA = {
   vencido: ["Vencido", "b-danger"], pausado: ["Pausado", ""], finalizado: ["Finalizado", ""],
 };
 const ICONO_TIPO = { tienda: "fa-store", proveedor: "fa-industry", almacen: "fa-warehouse", courier: "fa-truck-fast" };
+const ORDEN_SALUD = { inactiva: 0, en_caida: 1, atencion: 2, estable: 3, creciendo: 4, sin_datos: 5 };
+const ORDEN_ACTORES = [["u30", "Pedidos (30 días)"], ["variacion", "Variación vs. 30 días previos"], ["mes", "Pedidos del mes"], ["avance", "Avance de la meta"],
+  ["proyeccion", "Proyección del mes"], ["efectividad", "Efectividad de entrega"], ["perdida", "% devoluciones"], ["ultimo", "Último pedido"],
+  ["salud", "Salud (de crítica a sana)"], ["acuerdos", "Acuerdos vigentes"], ["nombre", "Nombre"]];
+const CAMPOS_ACTOR = {
+  u30: (e) => e.u30, variacion: (e) => e.variacion, mes: (e) => e.mes_actual, avance: (e) => e.avanceMeta, proyeccion: (e) => e.proyeccion,
+  efectividad: (e) => e.tasaEntrega, perdida: (e) => e.tasaPerdida, ultimo: (e) => e.ultimo_pedido, salud: (e) => ORDEN_SALUD[e.salud],
+  acuerdos: (e) => e.acuerdos_vigentes, nombre: (e) => e.nombre,
+};
 const CAMPO_PEDIDO = { tienda: "tienda_id", proveedor: "proveedor_id", almacen: "almacen_id", courier: "courier_id" };
 
 export const badgeSalud = (s, titulo = "") => html`<span class="salud ${s}" title="${titulo}"><i class="fas ${SALUD[s]?.[1] || "fa-circle"}"></i>${SALUD[s]?.[0] || s}</span>`;
@@ -145,9 +155,21 @@ async function formAcuerdo({ entidad = null, actual = null } = {}) {
 async function renderLista(cont, tipo, h) {
   const { paises } = await opciones();
   const f = { pais: h.pais || "", q: h.q || "", segmento: h.segmento || "", salud: h.salud || "", especial: h.especial || "" };
+  // Filtros y orden que se aplican en el navegador (la lista ya viene completa)
+  const v = { meta: h.meta || "", responsable: h.responsable || "", minimo: h.minimo || "", orden: h.orden || "u30", dir: h.dir || "desc" };
   const r = await api(`/api/seguimiento-actores/${tipo}?${qs(f)}`);
   if (!r.ok) { cont.innerHTML = String(vacio("fa-triangle-exclamation", "No se pudo cargar", r.data.mensaje)); return; }
-  const { filas, resumen, alertas } = r.data;
+  const { resumen, alertas } = r.data;
+  const responsables = [...new Set(r.data.filas.map((e) => e.responsable).filter(Boolean))].sort();
+  let filas = r.data.filas;
+  if (v.meta === "con") filas = filas.filter((e) => e.meta_pedidos_mes);
+  if (v.meta === "sin") filas = filas.filter((e) => !e.meta_pedidos_mes);
+  if (v.meta === "riesgo") filas = filas.filter((e) => e.meta_pedidos_mes && e.proyeccion < e.meta_pedidos_mes);
+  if (v.meta === "cumple") filas = filas.filter((e) => e.meta_pedidos_mes && e.proyeccion >= e.meta_pedidos_mes);
+  if (v.responsable === "_sin") filas = filas.filter((e) => !e.responsable);
+  else if (v.responsable) filas = filas.filter((e) => e.responsable === v.responsable);
+  if (v.minimo) filas = filas.filter((e) => (e.u30 || 0) >= Number(v.minimo));
+  filas = ordenar(filas, CAMPOS_ACTOR, v.orden, v.dir);
   const enlace = (extra) => `#/seguimiento?${qs({ tipo, ...f, ...extra })}`;
 
   encabezado("Seguimiento", `${TIPOS[tipo]}: volumen de pedidos, metas y trato especial`,
@@ -155,6 +177,7 @@ async function renderLista(cont, tipo, h) {
 
   cont.innerHTML = String(html`
     ${pestañas(tipo)}
+    <div id="indPanel"></div>
     <div class="chips">
       <a class="chip ${!f.salud && !f.especial ? "activo" : ""}" href="${enlace({ salud: "", especial: "" })}"><b>${numero(resumen.total)}</b> Todos</a>
       ${["creciendo", "estable", "atencion", "en_caida", "inactiva", "sin_datos"].map((s) => html`
@@ -170,9 +193,15 @@ async function renderLista(cont, tipo, h) {
           <input type="hidden" name="tipo" value="${tipo}"><input type="hidden" name="salud" value="${f.salud}"><input type="hidden" name="especial" value="${f.especial}">
           <div class="campo"><label>País</label><select class="ctrl" name="pais">${opcion("", "Todos", f.pais)}${paises.map((p) => opcion(p.codigo, p.nombre, f.pais))}</select></div>
           <div class="campo"><label>Segmento</label><select class="ctrl" name="segmento">${opcion("", "Todos", f.segmento)}${Object.entries(SEGMENTOS).map(([k, t]) => opcion(k, t, f.segmento))}</select></div>
+          <div class="campo"><label>Meta del mes</label><select class="ctrl" name="meta">${opcion("", "Todas", v.meta)}${opcion("con", "Con meta", v.meta)}${opcion("sin", "Sin meta", v.meta)}${opcion("riesgo", "No llegaría a la meta", v.meta)}${opcion("cumple", "Cumpliría la meta", v.meta)}</select></div>
+          <div class="campo"><label>Responsable</label><select class="ctrl" name="responsable">${opcion("", "Todos", v.responsable)}${opcion("_sin", "Sin asignar", v.responsable)}${responsables.map((x) => opcion(x, x, v.responsable))}</select></div>
+          <div class="campo"><label>Mín. pedidos 30 d</label><input type="number" class="ctrl" name="minimo" min="0" value="${v.minimo}" style="width:110px"></div>
           <div class="campo buscador"><label>Buscar</label><input class="ctrl" name="q" value="${f.q}" placeholder="Nombre o ID de Aurora" maxlength="80"></div>
+          <div class="campo">${selectorOrden(ORDEN_ACTORES, v.orden, v.dir)}</div>
           <button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button>
+          <a class="btn btn-ghost" href="#/seguimiento?tipo=${tipo}">Limpiar</a>
         </form>
+        <p class="muted conteo">${numero(filas.length)} de ${numero(r.data.filas.length)} ${TIPOS[tipo].toLowerCase()}</p>
         <div class="card">${filas.length ? html`
           <div class="tabla-wrap"><table class="tabla t-seguimiento">
             <thead><tr><th>${TIPO_UNO[tipo]}</th><th>Salud</th><th>Pedidos del mes</th><th class="num">30 días</th><th class="num">Efectividad</th><th class="num">Dev./canc.</th><th>Último pedido</th><th>Beneficios</th></tr></thead>
@@ -194,6 +223,8 @@ async function renderLista(cont, tipo, h) {
     </div>`);
 
   $("#filtros", cont).addEventListener("submit", (e) => { e.preventDefault(); location.hash = `#/seguimiento?${qs(Object.fromEntries(new FormData(e.target)))}`; });
+  for (const n of ["orden", "dir"]) $(`[name="${n}"]`, cont).addEventListener("change", () => $("#filtros", cont).requestSubmit());
+  panelIndicadores($("#indPanel", cont), "seguimiento", { tipo, pais: f.pais });
   $("#nuevaEnt")?.addEventListener("click", async () => { const n = await formEntidad(tipo); if (n) location.hash = `#/seguimiento?id=${n.id}`; });
   $("#verAlertas", cont)?.addEventListener("click", (ev) => { cont.querySelectorAll("[data-extra]").forEach((li) => (li.hidden = false)); ev.currentTarget.remove(); });
   cont.onclick = (e) => { const t = e.target.closest("[data-id]"); if (t) location.hash = `#/seguimiento?id=${t.dataset.id}`; };
@@ -202,8 +233,15 @@ async function renderLista(cont, tipo, h) {
 // =====================================================================  Acuerdos especiales (todos)
 async function renderAcuerdos(cont, h) {
   const f = { estado: h.estado ?? "activo", tipoEntidad: h.tipoEntidad || "", q: h.q || "" };
+  const v = { vigencia: h.vigencia || "", tipoAc: h.tipoAc || "", orden: h.orden || "hasta", dir: h.dir || "asc" };
   const r = await api(`/api/acuerdos?${qs(f)}`);
-  const lista = r.ok ? r.data.acuerdos : [];
+  let lista = r.ok ? r.data.acuerdos : [];
+  if (v.vigencia) lista = lista.filter((a) => a.vigencia === v.vigencia);
+  if (v.tipoAc) lista = lista.filter((a) => a.tipo === v.tipoAc);
+  lista = ordenar(lista, {
+    hasta: (a) => (a.vigente_hasta ? String(a.vigente_hasta).slice(0, 10) : null), desde: (a) => String(a.vigente_desde).slice(0, 10),
+    valor: (a) => (a.valor == null ? null : Number(a.valor)), umbral: (a) => a.umbral_pedidos, para: (a) => a.entidad_nombre, titulo: (a) => a.titulo,
+  }, v.orden, v.dir);
   const recargar = () => renderAcuerdos(cont, paramsHash());
   encabezado("Seguimiento", "Acuerdos especiales: descuentos exclusivos, tarifas y beneficios",
     puede("escribir") ? html`<button class="btn btn-brand btn-sm" id="nuevoAc"><i class="fas fa-plus"></i> Nuevo acuerdo</button>` : "");
@@ -213,9 +251,13 @@ async function renderAcuerdos(cont, h) {
       <input type="hidden" name="tipo" value="acuerdos">
       <div class="campo"><label>Estado</label><select class="ctrl" name="estado">${opcion("", "Todos", f.estado)}${opcion("activo", "Activos", f.estado)}${opcion("pausado", "Pausados", f.estado)}${opcion("finalizado", "Finalizados", f.estado)}</select></div>
       <div class="campo"><label>Aplica a</label><select class="ctrl" name="tipoEntidad">${opcion("", "Todos", f.tipoEntidad)}${Object.entries(TIPOS).map(([k, t]) => opcion(k, t, f.tipoEntidad))}</select></div>
+      <div class="campo"><label>Vigencia</label><select class="ctrl" name="vigencia">${opcion("", "Todas", v.vigencia)}${Object.entries(VIGENCIA).map(([k, [t]]) => opcion(k, t, v.vigencia))}</select></div>
+      <div class="campo"><label>Beneficio</label><select class="ctrl" name="tipoAc">${opcion("", "Todos", v.tipoAc)}${Object.entries(TIPOS_ACUERDO).map(([k, t]) => opcion(k, t, v.tipoAc))}</select></div>
       <div class="campo buscador"><label>Buscar</label><input class="ctrl" name="q" value="${f.q}" placeholder="Tienda, proveedor o beneficio" maxlength="80"></div>
+      <div class="campo">${selectorOrden([["hasta", "Fecha de vencimiento"], ["desde", "Inicio de vigencia"], ["valor", "Valor"], ["umbral", "Pedidos para ganarlo"], ["para", "Tienda / actor"], ["titulo", "Beneficio"]], v.orden, v.dir)}</div>
       <button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button>
     </form>
+    <p class="muted conteo">${numero(lista.length)} acuerdos</p>
     <div class="card">${lista.length ? html`<div class="tabla-wrap"><table class="tabla">
       <thead><tr><th>Beneficio</th><th>Para</th><th>Tipo</th><th class="num">Valor</th><th>Condición</th><th>Vigencia</th><th>Estado</th><th></th></tr></thead>
       <tbody>${lista.map((a, i) => html`<tr>
@@ -228,6 +270,7 @@ async function renderAcuerdos(cont, h) {
         <td class="nowrap">${puede("escribir") ? html`<button class="icon-btn" data-editar="${i}" aria-label="Editar"><i class="fas fa-pen"></i></button>` : ""}</td>
       </tr>`)}</tbody></table></div>` : vacio("fa-percent", "Sin acuerdos con estos filtros", "Registra descuentos exclusivos o beneficios para tiendas, proveedores, almacenes o couriers.")}</div>`);
   $("#filtros", cont).addEventListener("submit", (e) => { e.preventDefault(); location.hash = `#/seguimiento?${qs(Object.fromEntries(new FormData(e.target)))}`; });
+  for (const n of ["orden", "dir"]) $(`[name="${n}"]`, cont).addEventListener("change", () => $("#filtros", cont).requestSubmit());
   $("#nuevoAc")?.addEventListener("click", async () => { if (await formAcuerdo()) recargar(); });
   cont.onclick = async (e) => { const b = e.target.closest("[data-editar]"); if (b && (await formAcuerdo({ actual: lista[Number(b.dataset.editar)] }))) recargar(); };
 }

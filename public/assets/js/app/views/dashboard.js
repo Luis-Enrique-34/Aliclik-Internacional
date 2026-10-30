@@ -1,9 +1,15 @@
 // Tablero: indicadores del periodo, tendencia diaria, estados y rankings.
 import { api, html, raw, $, $$, numero, dinero, pct, hace, fechaHora, hoyIso, GRUPOS, encabezado, opciones, opcion, qs, vacio, iniciales, toast } from "../core.js";
 import { graficoLineas, composicion } from "../charts.js";
+import { panelIndicadores, ordenar } from "../indicadores.js";
 
 const filtros = { periodo: "30", desde: "", hasta: "", pais: "" };
 let dimension = "tiendas";
+const ordenRanking = { campo: "pedidos", dir: "desc" };
+const CAMPOS_RANKING = {
+  pedidos: (f) => f.pedidos, entregados: (f) => f.entregados, efectividad: (f) => (f.pedidos ? f.entregados / f.pedidos : null),
+  perdidos: (f) => (f.pedidos ? f.perdidos / f.pedidos : null), en_curso: (f) => f.en_curso, ultimo: (f) => f.ultimo_pedido, nombre: (f) => f.nombre,
+};
 
 function rangoDe(f) {
   if (f.periodo === "custom") return { desde: f.desde, hasta: f.hasta };
@@ -26,7 +32,8 @@ const DIM = {
   couriers: ["Couriers", "courier_id", "Courier"], paises: ["Países", "pais", "País"],
 };
 
-function tablaRanking(filas, r) {
+function tablaRanking(filasOrig, r) {
+  const filas = ordenar(filasOrig, CAMPOS_RANKING, ordenRanking.campo, ordenRanking.dir);
   if (!filas.length) return vacio("fa-ranking-star", "Sin datos en el periodo");
   const max = Math.max(...filas.map((f) => f.pedidos));
   const [, campo] = DIM[dimension];
@@ -93,7 +100,9 @@ export async function render(cont) {
       ${kpi("fa-coins", "Monto de pedidos", unaMoneda ? dinero(k.monto, monedaPais || d.rankings.paises[0] && paises.find((p) => p.codigo === d.rankings.paises[0].id)?.moneda) : "Varias monedas", unaMoneda ? html`${numero(k.unidades)} unidades` : "Filtra por país para ver el monto")}
     </div>
 
-    <div class="grid g-2-1 mt">
+    <div id="indPanel" class="mt"></div>
+
+    <div class="grid g-2-1">
       <div class="card"><div class="card-head"><h3>Pedidos por día</h3><span class="sub">Hora de Lima</span></div><div class="card-body" id="grafico"></div></div>
       <div class="card"><div class="card-head"><h3>Estado de los pedidos</h3></div><div class="card-body">${composicion(d.grupos, GRUPOS)}</div>
         <div class="card-head"><h3>Integraciones por país</h3><div class="der"><a href="#/integraciones" class="btn btn-ghost btn-sm">Ver todas</a></div></div>
@@ -106,7 +115,11 @@ export async function render(cont) {
 
     <div class="card mt">
       <div class="card-head"><h3>Ranking del ecosistema</h3><span class="sub">Clic en una fila para ver sus pedidos</span>
-        <div class="der"><div class="tabs" role="tablist">${Object.entries(DIM).map(([key, [txt]]) => html`<button class="tab ${dimension === key ? "activo" : ""}" data-dim="${key}" role="tab">${txt}</button>`)}</div></div></div>
+        <div class="der"><div class="tabs" role="tablist">${Object.entries(DIM).map(([key, [txt]]) => html`<button class="tab ${dimension === key ? "activo" : ""}" data-dim="${key}" role="tab">${txt}</button>`)}</div>
+          <select class="ctrl ctrl-sm" id="ordRanking" aria-label="Ordenar ranking">
+            ${[["pedidos", "Más pedidos"], ["entregados", "Más entregados"], ["efectividad", "Mayor efectividad"], ["perdidos", "Mayor % dev./canc."], ["en_curso", "Más en curso"], ["ultimo", "Pedido más reciente"], ["nombre", "Nombre (A-Z)"]]
+              .map(([v, t]) => opcion(v, t, ordenRanking.campo))}
+          </select></div></div>
       <div class="card-body" id="ranking">${tablaRanking(d.rankings[dimension], d.rango)}</div>
     </div>
 
@@ -152,7 +165,15 @@ export async function render(cont) {
     $$("[data-dim]", cont).forEach((x) => x.classList.toggle("activo", x === b));
     $("#ranking", cont).innerHTML = String(tablaRanking(d.rankings[dimension], d.rango));
   }));
+  $("#ordRanking", cont).addEventListener("change", (e) => {
+    ordenRanking.campo = e.target.value;
+    ordenRanking.dir = e.target.value === "nombre" ? "asc" : "desc";
+    $("#ranking", cont).innerHTML = String(tablaRanking(d.rankings[dimension], d.rango));
+  });
   cont.onclick = (e) => { const tr = e.target.closest("[data-ir]"); if (tr) location.hash = tr.dataset.ir; };
+
+  // Medidores, SLA y pronóstico (se cargan aparte para no demorar el tablero)
+  panelIndicadores($("#indPanel", cont), "pedidos", { pais: filtros.pais });
 
   // Las alertas se calculan aparte para que el tablero aparezca de inmediato
   api("/api/seguimiento-actores/alertas?limite=8").then((r) => {

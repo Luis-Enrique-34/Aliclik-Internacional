@@ -1,5 +1,6 @@
 // Cargas de datos: subir el CSV del query de Aurora, historial y clasificación de estados.
-import { api, html, raw, $, $$, numero, fechaHora, hace, encabezado, opcion, vacio, puede, toast, GRUPOS, badgeGrupo, resultado } from "../core.js";
+import { api, html, raw, $, $$, numero, fechaHora, hace, encabezado, opcion, vacio, puede, toast, GRUPOS, badgeGrupo, resultado, paramsHash, qs } from "../core.js";
+import { panelIndicadores, ordenar } from "../indicadores.js";
 
 const MAX_MB = 4;
 
@@ -31,13 +32,20 @@ async function subir(archivo, forzar = false, cont) {
 
 export async function render(cont, _ctx, mantenerForzar = false) {
   const [cg, est] = await Promise.all([api("/api/cargas"), api("/api/estados")]);
-  const cargas = cg.ok ? cg.data.cargas : [];
+  const h = paramsHash();
+  const v = { origen: h.origen || "", rechazos: h.rechazos || "", orden: h.orden || "fecha" };
+  const todas = cg.ok ? cg.data.cargas : [];
+  let cargas = todas;
+  if (v.origen) cargas = cargas.filter((c) => c.origen === v.origen);
+  if (v.rechazos) cargas = cargas.filter((c) => c.rechazadas > 0);
+  cargas = ordenar(cargas, { fecha: (c) => c.creado_en, filas: (c) => c.filas_total, nuevos: (c) => c.insertadas, rechazos: (c) => c.rechazadas, duracion: (c) => c.duracion_ms }, v.orden, "desc");
   const estados = est.ok ? est.data.estados : [];
   const escribir = puede("escribir");
 
-  encabezado("Cargas de datos", cargas[0] ? `Última carga ${hace(cargas[0].creado_en)}` : "Sin cargas todavía");
+  encabezado("Cargas de datos", todas[0] ? `Última carga ${hace(todas[0].creado_en)}` : "Sin cargas todavía");
 
   cont.innerHTML = String(html`
+    <div id="indPanel"></div>
     <div class="grid g-2-1">
       <div>
         ${escribir ? html`
@@ -54,7 +62,12 @@ export async function render(cont, _ctx, mantenerForzar = false) {
             <div id="resultado" class="mt"></div>
           </div></div>` : html`<div class="aviso info"><i class="fas fa-lock"></i><div>Tu rol es de <b>lectura</b>: puedes ver el historial, pero solo editores y administradores cargan datos.</div></div>`}
 
-        <div class="card mt"><div class="card-head"><h3>Historial de cargas</h3></div>
+        <div class="card mt"><div class="card-head"><h3>Historial de cargas</h3><span class="sub">${cargas.length} de ${todas.length}</span>
+          <div class="der fila-flex" id="filtroCargas">
+            <select class="ctrl ctrl-sm" name="origen" aria-label="Origen">${opcion("", "Todos los orígenes", v.origen)}${opcion("sync", "Automáticas", v.origen)}${opcion("csv", "CSV", v.origen)}</select>
+            <select class="ctrl ctrl-sm" name="rechazos" aria-label="Rechazos">${opcion("", "Con o sin rechazos", v.rechazos)}${opcion("1", "Solo con rechazos", v.rechazos)}</select>
+            <select class="ctrl ctrl-sm" name="orden" aria-label="Ordenar">${opcion("fecha", "Más recientes", v.orden)}${opcion("filas", "Más filas", v.orden)}${opcion("nuevos", "Más pedidos nuevos", v.orden)}${opcion("rechazos", "Más rechazos", v.orden)}${opcion("duracion", "Más lentas", v.orden)}</select>
+          </div></div>
           ${cargas.length ? html`<div class="tabla-wrap"><table class="tabla">
             <thead><tr><th>Fecha</th><th>Origen</th><th>Archivo</th><th class="num">Filas</th><th class="num">Nuevos</th><th class="num">Actualizados</th><th class="num">Rechazados</th><th>Pedidos entre</th><th>Usuario</th></tr></thead>
             <tbody>${cargas.map((c) => html`<tr>
@@ -93,6 +106,11 @@ export async function render(cont, _ctx, mantenerForzar = false) {
       </div>
     </div>`);
 
+  panelIndicadores($("#indPanel", cont), "cargas");
+  $("#filtroCargas", cont).addEventListener("change", () => {
+    const d = Object.fromEntries($$("#filtroCargas select", cont).map((x) => [x.name, x.value]));
+    location.hash = `#/cargas?${qs(d)}`;
+  });
   if (!escribir) return;
   const zona = $("#zona", cont);
   const input = $("#archivo", cont);

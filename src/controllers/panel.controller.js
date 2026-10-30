@@ -7,7 +7,7 @@ const { aCsv } = require("../utils/csv");
 const { ipDe, HttpError } = require("../utils/HttpError");
 const db = require("../config/database");
 
-const sinPaginacion = ({ pagina, porPagina, orden, ...f }) => f;
+const sinPaginacion = ({ pagina, porPagina, orden, dir, ...f }) => f;
 
 async function resumen(req, res) {
   res.json({ ok: true, ...(await dashboardService.resumen(sinPaginacion(req.datos), req.usuario.id)) });
@@ -18,8 +18,8 @@ async function ranking(req, res) {
 }
 
 async function pedidos(req, res) {
-  const { pagina, porPagina, orden, ...f } = req.datos;
-  res.json({ ok: true, pagina, porPagina, ...(await pedidoDAO.listar(f, { pagina, porPagina, orden })) });
+  const { pagina, porPagina, orden, dir, ...f } = req.datos;
+  res.json({ ok: true, pagina, porPagina, ...(await pedidoDAO.listar(f, { pagina, porPagina, orden, dir })) });
 }
 
 const COLUMNAS_EXPORT = [

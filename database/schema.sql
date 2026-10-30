@@ -338,6 +338,57 @@ BEGIN
 END $$;
 
 -- ---------------------------------------------------------------------
+--  9b. MARCAS DE CIERRE para los indicadores y SLA
+--      (cuándo se resolvió una observación, se integró un proveedor o
+--      se completó una tarea). Las llenan triggers: el código de la app
+--      no necesita cambiar y nunca quedan desactualizadas.
+-- ---------------------------------------------------------------------
+ALTER TABLE observaciones ADD COLUMN IF NOT EXISTS cerrada_en   TIMESTAMPTZ;
+ALTER TABLE integraciones ADD COLUMN IF NOT EXISTS integrada_en TIMESTAMPTZ;
+ALTER TABLE eventos       ADD COLUMN IF NOT EXISTS hecha_en     TIMESTAMPTZ;
+
+CREATE OR REPLACE FUNCTION fn_marcas_cierre() RETURNS trigger AS $$
+BEGIN
+    IF TG_TABLE_NAME = 'observaciones' THEN
+        IF NEW.estado IN ('resuelta', 'descartada') THEN
+            NEW.cerrada_en := COALESCE(CASE WHEN TG_OP = 'UPDATE' AND OLD.estado IN ('resuelta', 'descartada') THEN OLD.cerrada_en END, now());
+        ELSE
+            NEW.cerrada_en := NULL;
+        END IF;
+    ELSIF TG_TABLE_NAME = 'integraciones' THEN
+        IF NEW.estado = 'integrado' THEN
+            NEW.integrada_en := COALESCE(CASE WHEN TG_OP = 'UPDATE' AND OLD.estado = 'integrado' THEN OLD.integrada_en END, now());
+        ELSE
+            NEW.integrada_en := NULL;
+        END IF;
+    ELSIF TG_TABLE_NAME = 'eventos' THEN
+        IF NEW.estado_tarea = 'hecha' THEN
+            NEW.hecha_en := COALESCE(CASE WHEN TG_OP = 'UPDATE' AND OLD.estado_tarea = 'hecha' THEN OLD.hecha_en END, now());
+        ELSE
+            NEW.hecha_en := NULL;
+        END IF;
+    END IF;
+    RETURN NEW;
+END $$ LANGUAGE plpgsql;
+
+DO $$
+DECLARE t TEXT;
+BEGIN
+    FOREACH t IN ARRAY ARRAY['observaciones', 'integraciones', 'eventos'] LOOP
+        IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'tg_' || t || '_cierre') THEN
+            EXECUTE format('CREATE TRIGGER %I BEFORE INSERT OR UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION fn_marcas_cierre()',
+                           'tg_' || t || '_cierre', t);
+        END IF;
+    END LOOP;
+END $$;
+
+-- Datos que ya estaban cerrados antes de existir estas columnas: se usa su última actualización
+UPDATE observaciones SET cerrada_en   = actualizado_en WHERE estado IN ('resuelta', 'descartada') AND cerrada_en IS NULL;
+UPDATE integraciones SET integrada_en = actualizado_en WHERE estado = 'integrado' AND integrada_en IS NULL;
+UPDATE eventos       SET hecha_en     = actualizado_en WHERE estado_tarea = 'hecha' AND hecha_en IS NULL;
+CREATE INDEX IF NOT EXISTS ix_auditoria_accion ON auditoria (accion, creado_en DESC);
+
+-- ---------------------------------------------------------------------
 --  10. RLS en TODAS las tablas (sin políticas = acceso denegado a la API
 --      pública de Supabase). Además se retiran permisos a anon/authenticated.
 -- ---------------------------------------------------------------------

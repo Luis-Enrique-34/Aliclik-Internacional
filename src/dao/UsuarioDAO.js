@@ -2,7 +2,7 @@
 const BaseDAO = require("./BaseDAO");
 
 const PUBLICO = `id, nombres, apellidos, email, cargo, rol, estado, version_sesion,
-                 ultimo_login, bloqueado_hasta, intentos_fallidos, creado_en`;
+                 ultimo_login, bloqueado_hasta, intentos_fallidos, password_cambiada, creado_en`;
 
 class UsuarioDAO extends BaseDAO {
   crear({ nombres, apellidos, email, cargo, passwordHash, rol = "lector", estado = "pendiente" }) {

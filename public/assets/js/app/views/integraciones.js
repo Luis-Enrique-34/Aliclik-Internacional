@@ -2,6 +2,7 @@
 import { api, html, raw, $, $$, numero, hace, encabezado, opciones, opcion, qs, paramsHash, vacio, drawer, modal, confirmar, resultado, datosForm, puede, pais, urlSegura, ESTADO_INT, badge, CHECKS, toast } from "../core.js";
 import { bitacora } from "./_seguimiento.js";
 import { editorEvento } from "./calendario.js";
+import { panelIndicadores, selectorOrden, ordenar } from "../indicadores.js";
 
 const telLimpio = (t) => String(t || "").replace(/[^\d]/g, "");
 const whatsapp = (t) => (telLimpio(t).length >= 8 ? html`<a href="https://wa.me/${telLimpio(t)}" target="_blank" rel="noopener noreferrer" title="Abrir WhatsApp"><i class="fab fa-whatsapp"></i> ${t}</a>` : t || "—");
@@ -104,12 +105,37 @@ async function detalle(id, recargar) {
   bitacora(el.querySelector("#bitacora"), { recurso: "integracion", id: i.id, estados: ESTADO_INT, estadoActual: i.estado, onCambio: recargar });
 }
 
+const SLA_DIAS = 30, SIN_MOV_DIAS = 7; // mismos valores que src/config/metas.js
+const dias = (v) => (v ? (Date.now() - new Date(v).getTime()) / 86400000 : null);
+const ORDEN_INT = [["avance", "Avance del checklist"], ["antiguedad", "Días abierta"], ["pedidos", "Pedidos 30 días"], ["movimiento", "Último seguimiento"],
+  ["proveedor", "Proveedor"], ["pais", "País"], ["estado", "Estado"]];
+const CAMPOS_INT = {
+  avance: (i) => i.avance, antiguedad: (i) => (i.estado === "integrado" ? null : dias(i.creado_en)), pedidos: (i) => i.pedidos_30d,
+  movimiento: (i) => i.ultimo_seguimiento_en || i.actualizado_en, proveedor: (i) => i.proveedor_nombre, pais: (i) => i.pais,
+  estado: (i) => ({ pendiente: 0, en_proceso: 1, pausado: 2, integrado: 3 })[i.estado],
+};
+
 export async function render(cont) {
   const { paises } = await opciones();
   const h = paramsHash();
   const f = { pais: h.pais || "", estado: h.estado || "", q: h.q || "" };
+  const v = { paso: h.paso || "", avance: h.avance || "", sla: h.sla || "", responsable: h.responsable || "", pedidos: h.pedidos || "", orden: h.orden || "avance", dir: h.dir || "asc" };
   const r = await api(`/api/integraciones?${qs(f)}`);
-  const lista = r.ok ? r.data.integraciones : [];
+  const todas = r.ok ? r.data.integraciones : [];
+  const responsables = [...new Set(todas.map((i) => i.responsable).filter(Boolean))].sort();
+  let lista = todas;
+  if (v.paso) lista = lista.filter((i) => !i[v.paso]);
+  if (v.avance === "0") lista = lista.filter((i) => i.avance === 0);
+  if (v.avance === "1-49") lista = lista.filter((i) => i.avance > 0 && i.avance < 50);
+  if (v.avance === "50-99") lista = lista.filter((i) => i.avance >= 50 && i.avance < 100);
+  if (v.avance === "100") lista = lista.filter((i) => i.avance === 100);
+  if (v.sla === "fuera") lista = lista.filter((i) => !["integrado", "pausado"].includes(i.estado) && dias(i.creado_en) > SLA_DIAS);
+  if (v.sla === "sin_mov") lista = lista.filter((i) => !["integrado", "pausado"].includes(i.estado) && dias(i.ultimo_seguimiento_en || i.actualizado_en) > SIN_MOV_DIAS);
+  if (v.responsable === "_sin") lista = lista.filter((i) => !i.responsable);
+  else if (v.responsable) lista = lista.filter((i) => i.responsable === v.responsable);
+  if (v.pedidos === "con") lista = lista.filter((i) => i.pedidos_30d > 0);
+  if (v.pedidos === "sin") lista = lista.filter((i) => !i.pedidos_30d);
+  lista = ordenar(lista, CAMPOS_INT, v.orden, v.dir);
   const resumen = r.ok ? r.data.resumen : [];
   const recargar = () => render(cont);
 
@@ -117,6 +143,7 @@ export async function render(cont) {
     puede("escribir") ? html`<button class="btn btn-brand btn-sm" id="nueva"><i class="fas fa-plus"></i> Nueva integración</button>` : "");
 
   cont.innerHTML = String(html`
+    <div id="indPanel"></div>
     <div class="resumen-paises">${resumen.map((p) => html`
       <a class="card resumen-pais" href="#/integraciones?pais=${p.pais}" style="text-decoration:none;color:inherit">
         <div class="top"><span class="pais"><span class="cod">${p.pais}</span>${p.pais_nombre}</span><span class="n">${p.integrados}/${p.total}</span></div>
@@ -126,9 +153,17 @@ export async function render(cont) {
     <form class="filtros" id="filtros">
       <div class="campo"><label>País</label><select class="ctrl" name="pais">${opcion("", "Todos", f.pais)}${paises.filter((p) => p.codigo !== "PE").map((p) => opcion(p.codigo, p.nombre, f.pais))}</select></div>
       <div class="campo"><label>Estado</label><select class="ctrl" name="estado">${opcion("", "Todos", f.estado)}${Object.entries(ESTADO_INT).map(([k, [t]]) => opcion(k, t, f.estado))}</select></div>
+      <div class="campo"><label>Paso pendiente</label><select class="ctrl" name="paso">${opcion("", "Cualquiera", v.paso)}${CHECKS.map(([k, t]) => opcion(k, t, v.paso))}</select></div>
+      <div class="campo"><label>Avance</label><select class="ctrl" name="avance">${opcion("", "Todos", v.avance)}${opcion("0", "0 %", v.avance)}${opcion("1-49", "1 – 49 %", v.avance)}${opcion("50-99", "50 – 99 %", v.avance)}${opcion("100", "100 %", v.avance)}</select></div>
+      <div class="campo"><label>SLA</label><select class="ctrl" name="sla">${opcion("", "Todas", v.sla)}${opcion("fuera", `Abiertas > ${SLA_DIAS} días`, v.sla)}${opcion("sin_mov", `Sin movimiento > ${SIN_MOV_DIAS} días`, v.sla)}</select></div>
+      <div class="campo"><label>Responsable</label><select class="ctrl" name="responsable">${opcion("", "Todos", v.responsable)}${opcion("_sin", "Sin asignar", v.responsable)}${responsables.map((x) => opcion(x, x, v.responsable))}</select></div>
+      <div class="campo"><label>Pedidos</label><select class="ctrl" name="pedidos">${opcion("", "Todos", v.pedidos)}${opcion("con", "Ya vende (30 d)", v.pedidos)}${opcion("sin", "Sin pedidos", v.pedidos)}</select></div>
       <div class="campo buscador"><label>Buscar</label><input class="ctrl" name="q" value="${f.q}" placeholder="Proveedor, almacén o contacto" maxlength="80"></div>
+      <div class="campo">${selectorOrden(ORDEN_INT, v.orden, v.dir)}</div>
       <button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button>
+      <a class="btn btn-ghost" href="#/integraciones">Limpiar</a>
     </form>
+    <p class="muted conteo">${numero(lista.length)} de ${numero(todas.length)} integraciones</p>
     <div class="card">${lista.length ? html`
       <div class="tabla-wrap"><table class="tabla t-integraciones">
         <thead><tr><th>Proveedor</th><th>País</th><th>Almacén</th><th>Contacto</th><th>Checklist</th><th class="num">Avance</th><th>Estado</th><th class="num">Pedidos 30d</th><th>Último seguimiento</th></tr></thead>
@@ -149,6 +184,8 @@ export async function render(cont) {
     </div>`);
 
   $("#filtros", cont).addEventListener("submit", (e) => { e.preventDefault(); location.hash = `#/integraciones?${qs(Object.fromEntries(new FormData(e.target)))}`; });
+  for (const n of ["orden", "dir"]) $(`[name="${n}"]`, cont).addEventListener("change", () => $("#filtros", cont).requestSubmit());
+  panelIndicadores($("#indPanel", cont), "integraciones", { pais: f.pais });
   $("#nueva")?.addEventListener("click", async () => { const p = formulario(); setTimeout(enlazarNuevo, 60); if (await p) recargar(); });
   cont.onclick = async (e) => {
     const chk = e.target.closest("[data-chk]");

@@ -13,6 +13,7 @@ const g = require("../controllers/gestion.controller");
 const cal = require("../controllers/calendario.controller");
 const admin = require("../controllers/admin.controller");
 const seg = require("../controllers/seguimiento.controller");
+const ind = require("../controllers/indicador.controller");
 
 const router = express.Router();
 const q = (schema) => validate(schema, "query");
@@ -33,6 +34,9 @@ router.get("/dashboard/ranking/:dimension", p(s.rankingParams), q(s.filtrosPedid
 router.get("/pedidos", q(s.filtrosPedidos), panel.pedidos);
 router.get("/pedidos/estados", panel.estadosPedido);
 router.get("/pedidos/exportar.csv", q(s.filtrosPedidos), panel.exportar);
+
+// ------------------------------------------------- Indicadores por módulo (usuarios y auditoría: solo admin, se valida en el servicio)
+router.get("/indicadores/:modulo", p(s.indicadorParams), q(s.filtrosIndicador), ind.obtener);
 
 // ------------------------------------------------- Cargas de datos
 router.get("/cargas", panel.cargas);
@@ -92,6 +96,6 @@ router.post("/calendario/google/desconectar", cal.desconectar);
 router.get("/admin/usuarios", soloAdmin, admin.usuarios);
 router.patch("/admin/usuarios/:id", soloAdmin, idParam, validate(s.accesoSchema), admin.acceso);
 router.post("/admin/usuarios/:id/desbloquear", soloAdmin, idParam, admin.desbloquear);
-router.get("/admin/auditoria", soloAdmin, admin.auditoria);
+router.get("/admin/auditoria", soloAdmin, q(s.filtrosAuditoria), admin.auditoria);
 
 module.exports = router;

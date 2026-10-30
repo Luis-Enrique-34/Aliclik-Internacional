@@ -150,3 +150,100 @@ export function graficoBarras(cont, { etiquetas, valores, nombre, meta = null, r
   });
   svg.addEventListener("pointerleave", () => (tip.hidden = true));
 }
+
+/** Etiqueta corta para el eje X según el periodo de la serie. */
+function etiquetaX(v, periodo) {
+  if (periodo === "mes") {
+    const [a, m] = v.split("-").map(Number);
+    return new Date(Date.UTC(a, m - 1, 15)).toLocaleDateString("es-PE", { month: "short", year: "2-digit", timeZone: "UTC" });
+  }
+  return etiquetaDia(v);
+}
+
+/**
+ * Historia (línea continua) + pronóstico (línea discontinua con banda de confianza).
+ * @param {HTMLElement} cont
+ * @param {{ historia: {x:string, valor:number}[], futuro: {x:string, valor:number, bajo?:number, alto?:number}[], periodo?: "dia"|"semana"|"mes", unidad?: string }} d
+ */
+export function graficoPronostico(cont, { historia, futuro = [], periodo = "dia", unidad = "" }) {
+  const W = 860, H = 250, m = { t: 16, r: 20, b: 28, l: 48 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const puntos = [...historia.map((p) => ({ ...p, real: true })), ...futuro.map((p) => ({ ...p, real: false }))];
+  if (!puntos.length) { cont.innerHTML = '<p class="muted">Aún no hay historia suficiente.</p>'; return; }
+  const max = Math.max(0, ...puntos.map((p) => Math.max(p.valor || 0, p.alto || 0)));
+  const { tope, paso } = escala(max);
+  const n = puntos.length;
+  const x = (i) => m.l + (n <= 1 ? iw / 2 : (i * iw) / (n - 1));
+  const y = (v) => m.t + ih - ((v || 0) / tope) * ih;
+  const ticks = [];
+  for (let v = 0; v <= tope + 1e-9; v += paso) ticks.push(v);
+  const cada = Math.max(1, Math.ceil(n / 8));
+  const iH = historia.length - 1;
+  const linea = (desde, hasta) => puntos.slice(desde, hasta + 1).map((p, k) => `${x(desde + k).toFixed(1)},${y(p.valor).toFixed(1)}`).join(" ");
+  const conBanda = futuro.filter((p) => p.alto != null);
+  const i0 = historia.length;
+  const banda = conBanda.length
+    ? [...futuro.map((p, k) => `${x(i0 + k).toFixed(1)},${y(p.alto ?? p.valor).toFixed(1)}`), ...futuro.map((p, k) => `${x(i0 + k).toFixed(1)},${y(p.bajo ?? p.valor).toFixed(1)}`).reverse()]
+    : [];
+  if (banda.length && iH >= 0) { banda.unshift(`${x(iH).toFixed(1)},${y(historia[iH].valor).toFixed(1)}`); banda.push(`${x(iH).toFixed(1)},${y(historia[iH].valor).toFixed(1)}`); }
+
+  cont.innerHTML = String(html`
+    <div class="chart">
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Historia y pronóstico de ${unidad}">
+        <g class="rejilla">${ticks.map((v) => html`<line x1="${m.l}" x2="${W - m.r}" y1="${y(v)}" y2="${y(v)}"></line>`)}</g>
+        <g class="eje">
+          ${ticks.map((v) => html`<text x="${m.l - 8}" y="${y(v) + 4}" text-anchor="end">${numero(v)}</text>`)}
+          ${puntos.map((p, i) => ((i % cada === 0 && n - 1 - i >= cada / 2) || i === n - 1 ? html`<text x="${x(i)}" y="${H - 6}" text-anchor="middle">${etiquetaX(p.x, periodo)}</text>` : ""))}
+        </g>
+        ${futuro.length && iH >= 0 ? html`<rect class="zona-futuro" x="${x(iH)}" y="${m.t}" width="${W - m.r - x(iH)}" height="${ih}"></rect>
+          <text class="etiqueta-futuro" x="${x(iH) + 6}" y="${m.t + 12}">Pronóstico</text>` : ""}
+        ${banda.length ? html`<polygon class="banda" points="${banda.join(" ")}"></polygon>` : ""}
+        ${iH >= 0 ? html`<polygon class="area s1" points="${m.l},${y(0)} ${linea(0, iH)} ${x(iH)},${y(0)}"></polygon>
+          <polyline class="linea s1" points="${linea(0, iH)}"></polyline>` : ""}
+        ${futuro.length ? html`<polyline class="linea pron" points="${linea(Math.max(0, iH), n - 1)}"></polyline>` : ""}
+        <line class="guia" x1="0" x2="0" y1="${m.t}" y2="${m.t + ih}" visibility="hidden"></line>
+        <circle class="marca s1" r="4.5" cx="0" cy="0" visibility="hidden"></circle>
+        <rect x="${m.l}" y="${m.t}" width="${iw}" height="${ih}" fill="transparent" class="captura"></rect>
+      </svg>
+      <div class="tooltip" hidden></div>
+    </div>
+    <div class="leyenda"><span><span class="sw s1"></span>Real</span>${futuro.length ? html`<span><span class="sw pron"></span>Pronóstico</span>` : ""}${banda.length ? html`<span><span class="sw banda"></span>Rango probable (80 %)</span>` : ""}</div>`);
+
+  const svg = cont.querySelector("svg");
+  const tip = cont.querySelector(".tooltip");
+  const guia = svg.querySelector(".guia");
+  const marca = svg.querySelector(".marca");
+  svg.querySelector(".captura").addEventListener("pointermove", (e) => {
+    const r = svg.getBoundingClientRect();
+    const px = ((e.clientX - r.left) / r.width) * W;
+    const i = Math.max(0, Math.min(n - 1, Math.round(((px - m.l) / iw) * (n - 1))));
+    const p = puntos[i];
+    guia.setAttribute("x1", x(i)); guia.setAttribute("x2", x(i)); guia.setAttribute("visibility", "visible");
+    marca.setAttribute("cx", x(i)); marca.setAttribute("cy", y(p.valor)); marca.setAttribute("visibility", "visible");
+    marca.setAttribute("class", `marca ${p.real ? "s1" : "pron"}`);
+    tip.innerHTML = `<strong>${esc(periodo === "semana" ? `Semana del ${etiquetaX(p.x, "dia")}` : etiquetaX(p.x, periodo))}</strong>` +
+      `<div class="fila"><span>${p.real ? "Real" : "Pronóstico"}</span><b>${numero(p.valor)}</b></div>` +
+      (p.alto != null ? `<div class="fila"><span>Rango</span><b>${numero(p.bajo)} – ${numero(p.alto)}</b></div>` : "");
+    tip.hidden = false;
+    tip.style.left = `${(x(i) / W) * r.width}px`;
+    tip.style.top = `${(y(p.valor) / H) * r.height}px`;
+  });
+  svg.querySelector(".captura").addEventListener("pointerleave", () => { tip.hidden = true; guia.setAttribute("visibility", "hidden"); marca.setAttribute("visibility", "hidden"); });
+}
+
+/**
+ * Medidor semicircular (0–100 %) con marca de meta. Devuelve SVG listo para insertar.
+ * @param {number|null} valor @param {{meta?:number|null, estado?:string}} op
+ */
+export function medidor(valor, { meta = null, estado = "neutro" } = {}) {
+  const R = 52, cx = 64, cy = 62, L = Math.PI * R;
+  const v = valor == null ? 0 : Math.max(0, Math.min(100, valor));
+  const arco = `M${cx - R},${cy} A${R},${R} 0 0 1 ${cx + R},${cy}`;
+  const ang = (p) => Math.PI * (1 - p / 100);
+  const mx = (p, r) => cx + r * Math.cos(ang(p)), my = (p, r) => cy - r * Math.sin(ang(p));
+  return html`<svg class="medidor m-${estado}" viewBox="0 0 128 72" aria-hidden="true">
+      <path class="pista" d="${arco}"></path>
+      ${v > 0 ? html`<path class="valor" d="${arco}" stroke-dasharray="${(L * v) / 100} ${L}"></path>` : ""}
+      ${meta != null && meta <= 100 ? html`<line class="meta" x1="${mx(meta, R - 9)}" y1="${my(meta, R - 9)}" x2="${mx(meta, R + 9)}" y2="${my(meta, R + 9)}"></line>` : ""}
+    </svg>`;
+}

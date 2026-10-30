@@ -12,6 +12,7 @@ const EventoDAO = require("./EventoDAO");
 const GoogleCuentaDAO = require("./GoogleCuentaDAO");
 const AcuerdoDAO = require("./AcuerdoDAO");
 const MetricaDAO = require("./MetricaDAO");
+const IndicadorDAO = require("./IndicadorDAO");
 
 module.exports = {
   usuarioDAO: new UsuarioDAO(),
@@ -27,4 +28,5 @@ module.exports = {
   googleCuentaDAO: new GoogleCuentaDAO(),
   acuerdoDAO: new AcuerdoDAO(),
   metricaDAO: new MetricaDAO(),
+  indicadorDAO: new IndicadorDAO(),
 };

@@ -15,6 +15,10 @@ Plataforma interna del área de Sistemas para **monitorear los pedidos de la ope
 | **Cargas de datos** | Subir el CSV diario del query de Aurora, historial de cargas y clasificación de estados. |
 | **Usuarios / Auditoría** | Aprobación de cuentas, roles (admin, editor, lector) y registro de acciones de seguridad. |
 
+## Indicadores, SLA y pronósticos
+
+Cada módulo muestra medidores con meta, KPI con semáforo, hallazgos y pronósticos (tendencia + estacionalidad semanal), además de filtros y orden propios. Se puede presentar en pantalla completa o imprimir a PDF. Detalle y fórmulas: [docs/INDICADORES.md](docs/INDICADORES.md). Metas: `src/config/metas.js`.
+
 ## Tecnologías
 
 - **Frontend:** HTML, CSS y JavaScript (módulos ES, sin frameworks) · colores de Aliclik en paleta de bajo contraste (neutros + azul solo para acciones) · tema claro/oscuro · responsive (móvil, tablet, escritorio) · tipografías Inter y Plus Jakarta Sans (servidas localmente, sin Google Fonts)

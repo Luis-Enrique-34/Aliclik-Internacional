@@ -29,7 +29,13 @@ const filtrosPedidos = z.object({
   q: z.string().trim().max(80).optional(),
   pagina: z.coerce.number().int().min(1).max(10000).default(1),
   porPagina: z.coerce.number().int().min(10).max(200).default(50),
-  orden: z.enum(["fecha", "total", "estado"]).default("fecha"),
+  orden: z.enum(["fecha", "total", "estado", "tienda", "proveedor", "courier", "almacen", "entrega", "actualizacion", "unidades", "numero"]).default("fecha"),
+  dir: z.enum(["asc", "desc"]).default("desc"),
+  contraentrega: z.enum(["si", "no"]).optional(),
+  monto_min: z.preprocess((v) => (v === "" || v == null ? undefined : v), z.coerce.number().min(0).max(1e9).optional()),
+  monto_max: z.preprocess((v) => (v === "" || v == null ? undefined : v), z.coerce.number().min(0).max(1e9).optional()),
+  moneda: z.preprocess((v) => (v === "" ? undefined : v), z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/).optional()),
+  estancados: z.preprocess((v) => (v === "" || v == null ? undefined : v), z.coerce.number().int().min(1).max(365).optional()),
 }).refine((d) => !d.desde || !d.hasta || d.desde <= d.hasta, { message: "La fecha inicial debe ser menor o igual a la final", path: ["desde"] });
 
 const rankingParams = z.object({ dimension: z.enum(["tienda", "proveedor", "almacen", "courier", "pais"]) });
@@ -161,7 +167,34 @@ const accesoSchema = z.object({
   estado: z.enum(["pendiente", "activo", "suspendido"]).optional(),
 }).refine((d) => d.rol || d.estado, { message: "Nada que actualizar" });
 
+// ------------------------------------------------------------- Indicadores (medidores, KPI/SLA, pronósticos)
+const MODULOS_IND = ["pedidos", "seguimiento", "integraciones", "observaciones", "calendario", "usuarios", "auditoria", "cargas"];
+const indicadorParams = z.object({ modulo: z.enum(MODULOS_IND) });
+const filtrosIndicador = z.object({
+  pais: paisOpc,
+  tipo: z.enum(TIPOS).optional(),
+  tienda_id: idAurora,
+  proveedor_id: idAurora,
+  almacen_id: idAurora,
+  courier_id: idAurora,
+});
+
+// ------------------------------------------------------------- Auditoría (filtros)
+const vacioAUndef = (v) => (v === "" || v == null ? undefined : v);
+const filtrosAuditoria = z.object({
+  accion: z.preprocess(vacioAUndef, z.string().trim().max(40).regex(/^[A-Z_]+$/).optional()),
+  usuario_id: z.preprocess(vacioAUndef, z.uuid().optional()),
+  grupo: z.preprocess(vacioAUndef, z.enum(["seguridad", "accesos", "cambios", "cargas"]).optional()),
+  desde: z.preprocess(vacioAUndef, fecha.optional()),
+  hasta: z.preprocess(vacioAUndef, fecha.optional()),
+  ip: z.preprocess(vacioAUndef, z.string().trim().max(45).regex(/^[0-9a-fA-F:.]+$/, "IP no válida").optional()),
+  q: z.preprocess(vacioAUndef, z.string().trim().max(80).optional()),
+  orden: z.enum(["desc", "asc"]).default("desc"),
+  limite: z.coerce.number().int().min(50).max(1000).default(200),
+});
+
 module.exports = {
+  indicadorParams, filtrosIndicador, filtrosAuditoria,
   GRUPOS, filtrosPedidos, rankingParams, estadoGrupoSchema, estadoCodigoParam,
   tipoParam, entidadSchema,
   integracionSchema, filtrosIntegracion, checkSchema, ESTADOS_INT,

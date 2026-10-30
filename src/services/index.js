@@ -9,6 +9,7 @@ const DashboardService = require("./DashboardService");
 const NegocioService = require("./NegocioService");
 const CalendarioService = require("./CalendarioService");
 const SeguimientoService = require("./SeguimientoService");
+const IndicadorService = require("./IndicadorService");
 
 const seguimientoService = new SeguimientoService(daos);
 
@@ -20,4 +21,5 @@ module.exports = {
   seguimientoService,
   negocioService: new NegocioService(daos),
   calendarioService: new CalendarioService(daos),
+  indicadorService: new IndicadorService({ ...daos, seguimientoService }),
 };

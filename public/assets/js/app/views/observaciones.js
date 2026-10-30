@@ -1,8 +1,20 @@
 // Observaciones de la plataforma internacional (hoja "Observaciones" del Excel) con seguimiento.
 import { api, html, raw, $, hace, encabezado, opciones, opcion, qs, paramsHash, vacio, drawer, modal, confirmar, resultado, datosForm, puede, pais, ESTADO_OBS, badge, toast } from "../core.js";
 import { bitacora } from "./_seguimiento.js";
+import { panelIndicadores, selectorOrden, ordenar } from "../indicadores.js";
 
 const PRIO = { alta: ["Alta", "b-danger"], media: ["Media", "b-warn"], baja: ["Baja", ""] };
+const SLA = { alta: 2, media: 5, baja: 10 }; // días para resolver (mismos valores que src/config/metas.js)
+const ABIERTA = (o) => !["resuelta", "descartada"].includes(o.estado);
+const edad = (o) => (Date.now() - new Date(o.creado_en).getTime()) / 86400000;
+const vencida = (o) => ABIERTA(o) && edad(o) > SLA[o.prioridad];
+const ORDEN_OBS = [["actualizada", "Última actualización"], ["creada", "Fecha de registro"], ["prioridad", "Prioridad"], ["edad", "Antigüedad"],
+  ["comentarios", "Comentarios"], ["estado", "Estado"], ["modulo", "Módulo"], ["numero", "Número"]];
+const CAMPOS_OBS = {
+  actualizada: (o) => o.actualizado_en, creada: (o) => o.creado_en, prioridad: (o) => ({ baja: 0, media: 1, alta: 2 })[o.prioridad],
+  edad: (o) => (ABIERTA(o) ? edad(o) : null), comentarios: (o) => Number(o.comentarios) || 0,
+  estado: (o) => ({ abierta: 0, en_proceso: 1, resuelta: 2, descartada: 3 })[o.estado], modulo: (o) => o.modulo, numero: (o) => o.numero,
+};
 
 async function formulario(actual = null) {
   const { paises, usuarios } = await opciones();
@@ -54,20 +66,41 @@ export async function render(cont) {
   const { paises } = await opciones();
   const h = paramsHash();
   const f = { estado: h.estado || "", pais: h.pais || "" };
+  const v = { prioridad: h.prioridad || "", modulo: h.modulo || "", responsable: h.responsable || "", sla: h.sla || "", q: h.q || "", orden: h.orden || "actualizada", dir: h.dir || "desc" };
   const r = await api(`/api/observaciones?${qs(f)}`);
-  const lista = r.ok ? r.data.observaciones : [];
-  const abiertas = lista.filter((o) => !["resuelta", "descartada"].includes(o.estado)).length;
+  const todas = r.ok ? r.data.observaciones : [];
+  const modulos = [...new Set(todas.map((o) => o.modulo).filter(Boolean))].sort();
+  const responsables = [...new Set(todas.map((o) => o.responsable).filter(Boolean))].sort();
+  let lista = todas;
+  if (v.prioridad) lista = lista.filter((o) => o.prioridad === v.prioridad);
+  if (v.modulo) lista = lista.filter((o) => o.modulo === v.modulo);
+  if (v.responsable === "_sin") lista = lista.filter((o) => !o.responsable);
+  else if (v.responsable) lista = lista.filter((o) => o.responsable === v.responsable);
+  if (v.sla === "vencidas") lista = lista.filter(vencida);
+  if (v.sla === "en_plazo") lista = lista.filter((o) => ABIERTA(o) && !vencida(o));
+  if (v.q) { const t = v.q.toLowerCase(); lista = lista.filter((o) => `${o.numero} ${o.descripcion} ${o.nota || ""}`.toLowerCase().includes(t)); }
+  lista = ordenar(lista, CAMPOS_OBS, v.orden, v.dir);
+  const abiertas = todas.filter(ABIERTA).length;
   const recargar = () => render(cont);
 
-  encabezado("Observaciones", `${abiertas} abiertas de ${lista.length}`,
+  encabezado("Observaciones", `${abiertas} abiertas de ${todas.length}`,
     puede("escribir") ? html`<button class="btn btn-brand btn-sm" id="nueva"><i class="fas fa-plus"></i> Nueva observación</button>` : "");
 
   cont.innerHTML = String(html`
+    <div id="indPanel"></div>
     <form class="filtros" id="filtros">
       <div class="campo"><label>Estado</label><select class="ctrl" name="estado">${opcion("", "Todos", f.estado)}${Object.entries(ESTADO_OBS).map(([k, [t]]) => opcion(k, t, f.estado))}</select></div>
       <div class="campo"><label>País</label><select class="ctrl" name="pais">${opcion("", "Todos", f.pais)}${paises.map((p) => opcion(p.codigo, p.nombre, f.pais))}</select></div>
+      <div class="campo"><label>Prioridad</label><select class="ctrl" name="prioridad">${opcion("", "Todas", v.prioridad)}${Object.entries(PRIO).map(([k, [t]]) => opcion(k, t, v.prioridad))}</select></div>
+      <div class="campo"><label>Módulo</label><select class="ctrl" name="modulo">${opcion("", "Todos", v.modulo)}${modulos.map((x) => opcion(x, x, v.modulo))}</select></div>
+      <div class="campo"><label>Responsable</label><select class="ctrl" name="responsable">${opcion("", "Todos", v.responsable)}${opcion("_sin", "Sin asignar", v.responsable)}${responsables.map((x) => opcion(x, x, v.responsable))}</select></div>
+      <div class="campo"><label>SLA</label><select class="ctrl" name="sla">${opcion("", "Todas", v.sla)}${opcion("vencidas", "Vencidas", v.sla)}${opcion("en_plazo", "Abiertas en plazo", v.sla)}</select></div>
+      <div class="campo buscador"><label>Buscar</label><input class="ctrl" name="q" value="${v.q}" placeholder="N° o texto" maxlength="80"></div>
+      <div class="campo">${selectorOrden(ORDEN_OBS, v.orden, v.dir)}</div>
       <button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button>
+      <a class="btn btn-ghost" href="#/observaciones">Limpiar</a>
     </form>
+    <p class="muted conteo">${lista.length} de ${todas.length} observaciones</p>
     <div class="card">${lista.length ? html`
       <div class="tabla-wrap"><table class="tabla t-observaciones">
         <thead><tr><th>#</th><th>Descripción</th><th>Módulo</th><th>País</th><th>Prioridad</th><th>Estado</th><th>Responsable</th><th class="num">Comentarios</th><th>Actualizada</th></tr></thead>
@@ -75,12 +108,14 @@ export async function render(cont) {
           <tr class="clic" data-i="${i}">
             <td class="muted">${o.numero}</td><td><div class="truncar" style="max-width:420px">${o.descripcion}</div></td>
             <td>${o.modulo || "—"}</td><td>${o.pais ? pais(o.pais) : html`<span class="muted">General</span>`}</td>
-            <td>${badge(PRIO, o.prioridad)}</td><td>${badge(ESTADO_OBS, o.estado)}</td>
+            <td>${badge(PRIO, o.prioridad)}</td><td>${badge(ESTADO_OBS, o.estado)}${vencida(o) ? html` <span class="badge b-danger simple" title="Superó su SLA de ${SLA[o.prioridad]} días">Vencida</span>` : ""}</td>
             <td>${o.responsable || html`<span class="muted">—</span>`}</td><td class="num">${o.comentarios}</td><td class="muted nowrap">${hace(o.actualizado_en)}</td>
           </tr>`)}</tbody></table></div>`
       : vacio("fa-clipboard-check", "Sin observaciones", "Registra aquí los hallazgos de la operación internacional.")}
     </div>`);
   $("#filtros", cont).addEventListener("submit", (e) => { e.preventDefault(); location.hash = `#/observaciones?${qs(Object.fromEntries(new FormData(e.target)))}`; });
+  for (const n of ["orden", "dir"]) $(`[name="${n}"]`, cont).addEventListener("change", () => $("#filtros", cont).requestSubmit());
+  panelIndicadores($("#indPanel", cont), "observaciones", { pais: f.pais });
   $("#nueva")?.addEventListener("click", async () => { if (await formulario()) recargar(); });
   cont.onclick = (e) => { const tr = e.target.closest("tr[data-i]"); if (tr) detalle(lista[Number(tr.dataset.i)], recargar); };
 }

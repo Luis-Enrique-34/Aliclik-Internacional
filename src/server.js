@@ -3,7 +3,21 @@
 //  y sincroniza el calendario de Google cada N minutos.
 //  (En Vercel no se usa este archivo: ver api/index.js y vercel.json)
 // =====================================================================
-const { PORT, SYNC_INTERVAL_MIN, GOOGLE, APP_URL } = require("./config/env");
+let config;
+try {
+  config = require("./config/env");
+} catch (e) {
+  // Mensaje corto y claro en vez de una pila de errores larga
+  if (e.code === "MODULE_NOT_FOUND") {
+    console.error(`\n❌ Falta instalar dependencias (${e.message.split("\n")[0]}).\n   Ejecuta:  npm install\n`);
+  } else {
+    // env.js ya imprimió el detalle (❌ …); aquí solo se agrega la pista
+    if (!String(e.message).startsWith("Configuración inválida")) console.error(`\n❌ ${e.message}`);
+    console.error("   Revisa el archivo .env (debe estar junto a package.json). Guía: docs/GUIA-INSTALACION.md\n");
+  }
+  process.exit(1);
+}
+const { PORT, SYNC_INTERVAL_MIN, GOOGLE, APP_URL } = config;
 const app = require("./app");
 const db = require("./config/database");
 const logger = require("./utils/logger");

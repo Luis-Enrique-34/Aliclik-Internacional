@@ -1,5 +1,9 @@
 // Listado de pedidos con filtros, paginación, exportación y detalle.
 import { api, html, raw, $, numero, dinero, fecha, fechaHora, hoyIso, GRUPOS, badgeGrupo, encabezado, opciones, opcion, qs, paramsHash, vacio, drawer, pais } from "../core.js";
+import { panelIndicadores, selectorOrden } from "../indicadores.js";
+
+const ORDEN_PEDIDOS = [["fecha", "Fecha del pedido"], ["actualizacion", "Última actualización"], ["entrega", "Fecha de entrega"], ["total", "Monto"],
+  ["unidades", "Unidades"], ["estado", "Estado"], ["tienda", "Tienda"], ["proveedor", "Proveedor"], ["almacen", "Almacén"], ["courier", "Courier"], ["numero", "N° de pedido"]];
 
 const ETIQ = { tienda_id: "Tienda", proveedor_id: "Proveedor", almacen_id: "Almacén", courier_id: "Courier" };
 
@@ -8,7 +12,8 @@ export async function render(cont) {
   const h = paramsHash();
   const f = {
     desde: h.desde || hoyIso(-29), hasta: h.hasta || hoyIso(), pais: h.pais || "", grupo: h.grupo || "", estado: h.estado || "",
-    q: h.q || "", pagina: Number(h.pagina) || 1, orden: h.orden || "fecha",
+    q: h.q || "", pagina: Number(h.pagina) || 1, orden: h.orden || "fecha", dir: h.dir || "desc",
+    contraentrega: h.contraentrega || "", monto_min: h.monto_min || "", monto_max: h.monto_max || "", estancados: h.estancados || "",
     tienda_id: h.tienda_id || "", proveedor_id: h.proveedor_id || "", almacen_id: h.almacen_id || "", courier_id: h.courier_id || "",
   };
   const [res, est] = await Promise.all([api(`/api/pedidos?${qs(f)}`), api("/api/pedidos/estados")]);
@@ -27,11 +32,17 @@ export async function render(cont) {
       <div class="campo"><label>País</label><select class="ctrl" name="pais">${opcion("", "Todos", f.pais)}${paises.filter((p) => p.codigo !== "PE").map((p) => opcion(p.codigo, p.nombre, f.pais))}</select></div>
       <div class="campo"><label>Grupo</label><select class="ctrl" name="grupo">${opcion("", "Todos", f.grupo)}${Object.entries(GRUPOS).map(([k, v]) => opcion(k, v, f.grupo))}</select></div>
       <div class="campo"><label>Estado Aurora</label><select class="ctrl" name="estado">${opcion("", "Todos", f.estado)}${(est.data.estados || []).map((e) => opcion(e.estado_codigo, e.estado_label, f.estado))}</select></div>
+      <div class="campo"><label>Pago</label><select class="ctrl" name="contraentrega">${opcion("", "Todos", f.contraentrega)}${opcion("si", "Contraentrega", f.contraentrega)}${opcion("no", "Pago anticipado", f.contraentrega)}</select></div>
+      <div class="campo"><label>Antigüedad</label><select class="ctrl" name="estancados">${opcion("", "Todos", f.estancados)}${opcion("3", "En curso > 3 días", f.estancados)}${opcion("7", "En curso > 7 días", f.estancados)}${opcion("15", "En curso > 15 días", f.estancados)}</select></div>
+      <div class="campo"><label>Monto desde</label><input type="number" class="ctrl" name="monto_min" value="${f.monto_min}" min="0" step="0.01" style="width:110px"></div>
+      <div class="campo"><label>Monto hasta</label><input type="number" class="ctrl" name="monto_max" value="${f.monto_max}" min="0" step="0.01" style="width:110px"></div>
       <div class="campo buscador"><label>Buscar</label><i class="fas fa-magnifying-glass" style="top:auto;bottom:12px;transform:none"></i><input class="ctrl" name="q" value="${f.q}" placeholder="N° pedido, tienda, proveedor…" maxlength="80"></div>
+      <div class="campo">${selectorOrden(ORDEN_PEDIDOS, f.orden, f.dir)}</div>
       ${Object.keys(ETIQ).map((k) => html`<input type="hidden" name="${k}" value="${f[k]}">`)}
       <button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button>
       <a class="btn btn-ghost" href="#/pedidos">Limpiar</a>
     </form>
+    <div id="indPanel"></div>
     ${filtroEntidad ? html`<div class="aviso info"><i class="fas fa-filter"></i><div>Filtrando por <b>${ETIQ[filtroEntidad]}: ${nombreEntidad || f[filtroEntidad]}</b> (ID ${f[filtroEntidad]}). <a href="#/pedidos?${qs({ ...f, [filtroEntidad]: "", pagina: "" })}">Quitar filtro</a></div></div>` : ""}
     <div class="card">
       ${datos.filas.length ? html`
@@ -57,6 +68,10 @@ export async function render(cont) {
         </div></div>`
       : vacio("fa-box-open", "No hay pedidos con estos filtros", "Prueba con otro rango de fechas o carga datos nuevos.")}
     </div>`);
+
+  panelIndicadores($("#indPanel", cont), "pedidos", { pais: f.pais, tienda_id: f.tienda_id, proveedor_id: f.proveedor_id, almacen_id: f.almacen_id, courier_id: f.courier_id });
+  // Cambiar el orden aplica al instante
+  for (const n of ["orden", "dir"]) $(`[name="${n}"]`, cont).addEventListener("change", () => $("#filtros", cont).requestSubmit());
 
   $("#filtros", cont).addEventListener("submit", (e) => {
     e.preventDefault();

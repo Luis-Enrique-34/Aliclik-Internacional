@@ -15,10 +15,19 @@ const DIMENSIONES = {
   pais: { id: "p.pais", nombre: "pa.nombre" },
 };
 
+// Orden permitido (lista blanca): campo → expresión. La dirección se agrega aparte (ASC/DESC fijos).
 const ORDENES = {
-  fecha: "p.fecha_pedido DESC",
-  total: "p.total DESC",
-  estado: "p.estado_label ASC, p.fecha_pedido DESC",
+  fecha: "p.fecha_pedido",
+  total: "p.total",
+  estado: "p.estado_label",
+  tienda: "p.tienda_nombre",
+  proveedor: "p.proveedor_nombre",
+  courier: "p.courier_nombre",
+  almacen: "p.almacen_nombre",
+  entrega: "p.fecha_entrega",
+  actualizacion: "p.fecha_actualizacion",
+  unidades: "p.unidades",
+  numero: "p.order_number",
 };
 
 const COLUMNAS = [
@@ -47,6 +56,13 @@ class PedidoDAO extends BaseDAO {
     }
     if (f.grupo) cond.push(`COALESCE(eg.grupo, 'otro') = ${p(f.grupo)}`);
     if (f.estado) cond.push(`p.estado_codigo = ${p(f.estado)}`);
+    if (f.contraentrega === "si") cond.push("p.contraentrega IS TRUE");
+    if (f.contraentrega === "no") cond.push("p.contraentrega IS NOT TRUE");
+    if (f.monto_min != null) cond.push(`p.total >= ${p(f.monto_min)}`);
+    if (f.monto_max != null) cond.push(`p.total <= ${p(f.monto_max)}`);
+    if (f.moneda) cond.push(`p.moneda = ${p(f.moneda)}`);
+    // En curso (pendiente / en preparación / en ruta) con más de N días desde el pedido
+    if (f.estancados) cond.push(`COALESCE(eg.grupo, 'otro') IN ('pendiente','en_proceso','en_ruta') AND p.dia_local < (now() AT TIME ZONE '${ZONA_HORARIA.replace(/'/g, "")}')::date - ${p(f.estancados)}::int`);
     if (f.q) {
       const like = p(`%${f.q}%`);
       cond.push(`(p.order_number ILIKE ${like} OR p.tienda_nombre ILIKE ${like} OR p.proveedor_nombre ILIKE ${like}
@@ -140,7 +156,7 @@ class PedidoDAO extends BaseDAO {
   }
 
   /** Listado paginado. */
-  async listar(f, { pagina = 1, porPagina = 50, orden = "fecha" } = {}) {
+  async listar(f, { pagina = 1, porPagina = 50, orden = "fecha", dir = "desc" } = {}) {
     const { where, params } = this.filtros(f);
     const total = await this.uno(
       `SELECT count(*)::int AS n FROM pedidos p LEFT JOIN estado_grupos eg ON eg.estado_codigo = p.estado_codigo ${where}`,
@@ -151,7 +167,7 @@ class PedidoDAO extends BaseDAO {
       `SELECT p.*, COALESCE(eg.grupo, 'otro') AS grupo
          FROM pedidos p LEFT JOIN estado_grupos eg ON eg.estado_codigo = p.estado_codigo
         ${where}
-        ORDER BY ${ORDENES[orden] || ORDENES.fecha}
+        ORDER BY ${ORDENES[orden] || ORDENES.fecha} ${dir === "asc" ? "ASC" : "DESC"} NULLS LAST, p.order_id DESC
         LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params
     );

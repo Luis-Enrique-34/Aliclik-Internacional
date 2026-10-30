@@ -1,6 +1,7 @@
 // Calendario de reuniones y tareas con sincronización bidireccional con Google Calendar.
 import { api, html, raw, $, $$, encabezado, opcion, paramsHash, modal, confirmar, resultado, datosForm, toast, hace, hora, hoyIso
 , urlSegura } from "../core.js";
+import { panelIndicadores, ordenar } from "../indicadores.js";
 
 const OFFSET = "-05:00"; // America/Lima (sin horario de verano)
 const DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -8,6 +9,19 @@ let vista = "mes";                    // "mes" (por defecto) o "dia"
 let mesActual = hoyIso().slice(0, 7); // "AAAA-MM"
 let diaActual = hoyIso();             // "AAAA-MM-DD"
 let filtroTipo = "";
+// Filtros extra (se aplican en el navegador sobre lo ya cargado)
+const extra = { prioridad: "", origen: "", vinculo: "", estado: "", ordenTareas: "vence" };
+const ORDEN_TAREAS = { vence: (t) => t.fin, prioridad: (t) => ({ alta: 0, media: 1, baja: 2 })[t.prioridad], titulo: (t) => t.titulo };
+function pasaFiltros(e) {
+  if (extra.prioridad && e.prioridad !== extra.prioridad) return false;
+  if (extra.origen === "google" && !e.google_event_id) return false;
+  if (extra.origen === "local" && e.google_event_id) return false;
+  if (extra.vinculo === "con" && !(e.integracion_id || e.entidad_id)) return false;
+  if (extra.vinculo === "sin" && (e.integracion_id || e.entidad_id)) return false;
+  if (extra.estado && e.tipo === "tarea" && (e.estado_tarea || "pendiente") !== extra.estado) return false;
+  if (extra.estado && e.tipo !== "tarea") return false;
+  return true;
+}
 const HORA_INICIO = 7;   // la vista por día muestra de 07:00…
 const HORA_FIN = 21;     // …a 21:00 (se amplía si hay eventos fuera de ese rango)
 const ALTO_HORA = 56;    // px por hora
@@ -213,9 +227,10 @@ export async function render(cont) {
     api(`/api/calendario?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}${filtroTipo ? `&tipo=${filtroTipo}` : ""}`),
     api("/api/calendario/tareas"),
   ]);
-  const eventos = res.ok ? res.data.eventos : [];
+  const eventos = (res.ok ? res.data.eventos : []).filter(pasaFiltros);
   const g = res.data.google || {};
-  const tareas = tar.ok ? tar.data.tareas : [];
+  const tareas = ordenar((tar.ok ? tar.data.tareas : []).filter((t) => !extra.prioridad || t.prioridad === extra.prioridad),
+    ORDEN_TAREAS, extra.ordenTareas, "asc");
   const porDia = new Map(dias.map((d) => [d, []]));
   for (const e of eventos) {
     const di = partes(e.inicio).fecha, df = partes(e.fin).fecha;
@@ -230,6 +245,7 @@ export async function render(cont) {
     html`<button class="btn btn-ghost btn-sm" data-nuevo="tarea"><i class="fas fa-list-check"></i> Tarea</button><button class="btn btn-brand btn-sm" data-nuevo="reunion"><i class="fas fa-plus"></i> Reunión</button>`);
 
   cont.innerHTML = String(html`
+    <div id="indPanel"></div>
     <div class="cal-google">
       <div class="estado-g"><i class="fab fa-google"></i>
         ${!g.habilitado ? html`<span class="muted">La sincronización con Google Calendar no está configurada en el servidor (ver docs/GUIA-GOOGLE-CALENDAR.md).</span>`
@@ -256,6 +272,13 @@ export async function render(cont) {
             <div class="tabs">${[["", "Todo"], ["reunion", "Reuniones"], ["tarea", "Tareas"]].map(([k, t]) => html`<button class="tab ${filtroTipo === k ? "activo" : ""}" data-tipo="${k}">${t}</button>`)}</div>
           </div>
         </div>
+        <div class="cal-filtros fila-flex" id="calFiltros">
+          <span class="muted"><i class="fas fa-filter"></i></span>
+          <select class="ctrl ctrl-sm" name="prioridad" aria-label="Prioridad">${opcion("", "Toda prioridad", extra.prioridad)}${opcion("alta", "Prioridad alta", extra.prioridad)}${opcion("media", "Prioridad media", extra.prioridad)}${opcion("baja", "Prioridad baja", extra.prioridad)}</select>
+          <select class="ctrl ctrl-sm" name="estado" aria-label="Estado de tarea">${opcion("", "Todo estado", extra.estado)}${opcion("pendiente", "Tareas pendientes", extra.estado)}${opcion("en_curso", "Tareas en curso", extra.estado)}${opcion("hecha", "Tareas hechas", extra.estado)}</select>
+          <select class="ctrl ctrl-sm" name="vinculo" aria-label="Vínculo">${opcion("", "Con o sin vínculo", extra.vinculo)}${opcion("con", "Vinculados a integración/actor", extra.vinculo)}${opcion("sin", "Sin vincular", extra.vinculo)}</select>
+          <select class="ctrl ctrl-sm" name="origen" aria-label="Origen">${opcion("", "Todos los orígenes", extra.origen)}${opcion("google", "Sincronizados con Google", extra.origen)}${opcion("local", "Solo en la plataforma", extra.origen)}</select>
+        </div>
         <div class="cal-cuerpo">${vista === "mes" ? vistaMes(dias, porDia, hoy) : vistaDia(semana, porDia, hoy)}</div>
         <div class="cal-leyenda"><span><i class="cuadro reunion"></i>Reunión</span><span><i class="cuadro tarea"></i>Tarea</span><span><i class="fab fa-google"></i> Sincronizado con Google</span>
           <span class="muted">${vista === "mes" ? "Clic en un número para ver el día · clic en un espacio vacío para agendar" : "Clic en una hora para agendar"}</span></div>
@@ -263,7 +286,8 @@ export async function render(cont) {
       <aside class="grid" style="align-content:start">
         ${vista === "dia" ? html`<div class="card"><div class="card-head"><h3>Agenda del día</h3><span class="sub">${delDia.length}</span></div>
           <div class="card-body">${delDia.length ? html`<ul class="agenda-dia">${delDia.map((e) => html`<li class="${claseEv(e)}" data-ev="${e.id}"><span class="hh">${e.todo_el_dia ? "Todo el día" : `${hhmm(e.inicio)} – ${hhmm(e.fin)}`}</span><strong>${e.titulo}</strong>${e.meet_link && urlSegura(e.meet_link) ? html`<a href="${urlSegura(e.meet_link)}" target="_blank" rel="noopener noreferrer" class="meet"><i class="fas fa-video"></i> Unirse</a>` : ""}</li>`)}</ul>` : html`<p class="muted">Día libre.</p>`}</div></div>` : ""}
-        <div class="card"><div class="card-head"><h3>Mis tareas abiertas</h3><span class="sub">${tareas.length}</span></div>
+        <div class="card"><div class="card-head"><h3>Mis tareas abiertas</h3><span class="sub">${tareas.length}</span>
+          <div class="der"><select class="ctrl ctrl-sm" id="ordTareas" aria-label="Ordenar tareas">${opcion("vence", "Por vencimiento", extra.ordenTareas)}${opcion("prioridad", "Por prioridad", extra.ordenTareas)}${opcion("titulo", "Por título", extra.ordenTareas)}</select></div></div>
           <div class="card-body">${tareas.length ? html`<ul class="lista-tareas">${tareas.map((t) => html`
             <li><input type="checkbox" data-hecha="${t.id}" aria-label="Marcar como hecha">
               <div class="t"><strong class="${t.prioridad === "alta" ? "prio-alta" : ""}">${t.titulo}</strong>
@@ -290,6 +314,9 @@ export async function render(cont) {
     recargar();
   }));
   $$("[data-tipo]", cont).forEach((b) => b.addEventListener("click", () => { filtroTipo = b.dataset.tipo; recargar(); }));
+  $("#calFiltros", cont).addEventListener("change", (e) => { extra[e.target.name] = e.target.value; recargar(); });
+  $("#ordTareas", cont).addEventListener("change", (e) => { extra.ordenTareas = e.target.value; recargar(); });
+  panelIndicadores($("#indPanel", cont), "calendario");
   $$("#accionesVista [data-nuevo]").forEach((b) => b.addEventListener("click", () => editorEvento({ tipo: b.dataset.nuevo, fecha: vista === "dia" ? diaActual : undefined }, recargar)));
   $("#sync", cont)?.addEventListener("click", async (e) => {
     e.currentTarget.disabled = true;

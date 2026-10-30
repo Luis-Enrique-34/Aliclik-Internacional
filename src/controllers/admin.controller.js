@@ -22,8 +22,11 @@ async function desbloquear(req, res) {
 }
 
 async function auditoria(req, res) {
-  const accion = typeof req.query.accion === "string" ? req.query.accion.slice(0, 40) : null;
-  const [registros, acciones] = await Promise.all([adminService.auditoriaListar({ accion }), auditoriaDAO.acciones()]);
+  const { accion, usuario_id: usuarioId, grupo, desde, hasta, ip, q, orden, limite } = req.datos;
+  const [registros, acciones] = await Promise.all([
+    adminService.auditoriaListar({ accion, usuarioId, grupo, desde, hasta, ip, q, orden, limite }),
+    auditoriaDAO.acciones(),
+  ]);
   res.json({ ok: true, registros, acciones: acciones.map((a) => a.accion) });
 }
 
