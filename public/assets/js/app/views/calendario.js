@@ -287,7 +287,7 @@ export async function render(cont) {
         ${vista === "dia" ? html`<div class="card"><div class="card-head"><h3>Agenda del día</h3><span class="sub">${delDia.length}</span></div>
           <div class="card-body">${delDia.length ? html`<ul class="agenda-dia">${delDia.map((e) => html`<li class="${claseEv(e)}" data-ev="${e.id}"><span class="hh">${e.todo_el_dia ? "Todo el día" : `${hhmm(e.inicio)} – ${hhmm(e.fin)}`}</span><strong>${e.titulo}</strong>${e.meet_link && urlSegura(e.meet_link) ? html`<a href="${urlSegura(e.meet_link)}" target="_blank" rel="noopener noreferrer" class="meet"><i class="fas fa-video"></i> Unirse</a>` : ""}</li>`)}</ul>` : html`<p class="muted">Día libre.</p>`}</div></div>` : ""}
         <div class="card"><div class="card-head"><h3>Mis tareas abiertas</h3><span class="sub">${tareas.length}</span>
-          <div class="der"><select class="ctrl ctrl-sm" id="ordTareas" aria-label="Ordenar tareas">${opcion("vence", "Por vencimiento", extra.ordenTareas)}${opcion("prioridad", "Por prioridad", extra.ordenTareas)}${opcion("titulo", "Por título", extra.ordenTareas)}</select></div></div>
+          <div class="der"><select class="ctrl ctrl-sm" id="ordTareas" aria-label="Ordenar tareas">${opcion("vence", "Vencimiento: más próximo", extra.ordenTareas)}${opcion("prioridad", "Prioridad: alta primero", extra.ordenTareas)}${opcion("titulo", "Título: A → Z", extra.ordenTareas)}</select></div></div>
           <div class="card-body">${tareas.length ? html`<ul class="lista-tareas">${tareas.map((t) => html`
             <li><input type="checkbox" data-hecha="${t.id}" aria-label="Marcar como hecha">
               <div class="t"><strong class="${t.prioridad === "alta" ? "prio-alta" : ""}">${t.titulo}</strong>

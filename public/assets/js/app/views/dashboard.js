@@ -117,8 +117,10 @@ export async function render(cont) {
       <div class="card-head"><h3>Ranking del ecosistema</h3><span class="sub">Clic en una fila para ver sus pedidos</span>
         <div class="der"><div class="tabs" role="tablist">${Object.entries(DIM).map(([key, [txt]]) => html`<button class="tab ${dimension === key ? "activo" : ""}" data-dim="${key}" role="tab">${txt}</button>`)}</div>
           <select class="ctrl ctrl-sm" id="ordRanking" aria-label="Ordenar ranking">
-            ${[["pedidos", "Más pedidos"], ["entregados", "Más entregados"], ["efectividad", "Mayor efectividad"], ["perdidos", "Mayor % dev./canc."], ["en_curso", "Más en curso"], ["ultimo", "Pedido más reciente"], ["nombre", "Nombre (A-Z)"]]
-              .map(([v, t]) => opcion(v, t, ordenRanking.campo))}
+            ${[["pedidos|desc", "Pedidos: mayor a menor"], ["pedidos|asc", "Pedidos: menor a mayor"], ["efectividad|desc", "Efectividad %: mayor a menor"], ["efectividad|asc", "Efectividad %: menor a mayor"],
+              ["perdidos|desc", "Dev./canc. %: mayor a menor"], ["perdidos|asc", "Dev./canc. %: menor a mayor"], ["entregados|desc", "Entregados: mayor a menor"],
+              ["en_curso|desc", "En curso: mayor a menor"], ["ultimo|desc", "Último pedido: más reciente"], ["nombre|asc", "Nombre: A → Z"], ["nombre|desc", "Nombre: Z → A"]]
+              .map(([v, t]) => opcion(v, t, `${ordenRanking.campo}|${ordenRanking.dir}`))}
           </select></div></div>
       <div class="card-body" id="ranking">${tablaRanking(d.rankings[dimension], d.rango)}</div>
     </div>
@@ -166,8 +168,7 @@ export async function render(cont) {
     $("#ranking", cont).innerHTML = String(tablaRanking(d.rankings[dimension], d.rango));
   }));
   $("#ordRanking", cont).addEventListener("change", (e) => {
-    ordenRanking.campo = e.target.value;
-    ordenRanking.dir = e.target.value === "nombre" ? "asc" : "desc";
+    [ordenRanking.campo, ordenRanking.dir] = e.target.value.split("|");
     $("#ranking", cont).innerHTML = String(tablaRanking(d.rankings[dimension], d.rango));
   });
   cont.onclick = (e) => { const tr = e.target.closest("[data-ir]"); if (tr) location.hash = tr.dataset.ir; };

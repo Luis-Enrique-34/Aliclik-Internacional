@@ -1,11 +1,12 @@
 // Administración de usuarios: aprobar solicitudes, cambiar roles, suspender y desbloquear.
 import { api, html, raw, $, $$, hace, encabezado, opcion, ROLES, resultado, confirmar, estado, vacio, iniciales, paramsHash, qs } from "../core.js";
-import { panelIndicadores, selectorOrden, ordenar } from "../indicadores.js";
+import { panelIndicadores, selectorOrden, enlazarOrden, ordenar } from "../indicadores.js";
 
 const dias = (v) => (v ? (Date.now() - new Date(v).getTime()) / 86400000 : null);
-const ORDEN_USR = [["ultimo", "Último ingreso"], ["registro", "Fecha de registro"], ["nombre", "Nombre"], ["rol", "Rol"], ["estado", "Estado"], ["password", "Antigüedad de la contraseña"]];
+const ORDEN_USR = [["ultimo", "Último ingreso", "fecha"], ["nombre", "Nombre", "texto"], ["correo", "Correo", "texto"], ["registro", "Fecha de registro", "fecha"],
+  ["rol", "Rol (de lector a admin)", "nivel"], ["estado", "Estado", "nivel"], ["password", "Antigüedad de la contraseña", "dias"]];
 const CAMPOS_USR = {
-  ultimo: (u) => u.ultimo_login, registro: (u) => u.creado_en, nombre: (u) => `${u.nombres} ${u.apellidos}`,
+  ultimo: (u) => u.ultimo_login, registro: (u) => u.creado_en, nombre: (u) => `${u.nombres} ${u.apellidos}`, correo: (u) => u.email,
   rol: (u) => ({ lector: 0, editor: 1, admin: 2 })[u.rol], estado: (u) => ({ pendiente: 0, activo: 1, suspendido: 2 })[u.estado],
   password: (u) => dias(u.password_cambiada),
 };
@@ -39,9 +40,8 @@ export async function render(cont) {
       <div class="campo"><label>Estado</label><select class="ctrl" name="estado">${opcion("", "Todos", v.estado)}${Object.entries(ESTADOS).map(([k, [t]]) => opcion(k, t, v.estado))}${opcion("bloqueado", "Bloqueados ahora", v.estado)}</select></div>
       <div class="campo"><label>Actividad</label><select class="ctrl" name="actividad">${opcion("", "Todas", v.actividad)}${opcion("7", "Entraron esta semana", v.actividad)}${opcion("inactivo", "Sin entrar en 30 días", v.actividad)}${opcion("nunca", "Nunca entraron", v.actividad)}</select></div>
       <div class="campo buscador"><label>Buscar</label><input class="ctrl" name="q" value="${v.q}" placeholder="Nombre, correo o cargo" maxlength="80"></div>
-      <div class="campo">${selectorOrden(ORDEN_USR, v.orden, v.dir)}</div>
-      <button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button>
-      <a class="btn btn-ghost" href="#/usuarios">Limpiar</a>
+      ${selectorOrden(ORDEN_USR, v.orden, v.dir)}
+      <div class="filtros-acciones"><button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button><a class="btn btn-ghost" href="#/usuarios">Limpiar</a></div>
     </form>
     <p class="muted conteo">${lista.length} de ${todos.length} usuarios</p>
     <div class="card">${lista.length ? html`<div class="tabla-wrap"><table class="tabla">
@@ -64,7 +64,7 @@ export async function render(cont) {
       })}</tbody></table></div>` : vacio("fa-users", "Sin usuarios con estos filtros")}</div>`);
 
   $("#filtros", cont).addEventListener("submit", (e) => { e.preventDefault(); location.hash = `#/usuarios?${qs(Object.fromEntries(new FormData(e.target)))}`; });
-  for (const n of ["orden", "dir"]) $(`[name="${n}"]`, cont).addEventListener("change", () => $("#filtros", cont).requestSubmit());
+  enlazarOrden(cont, () => $("#filtros", cont).requestSubmit());
   panelIndicadores($("#indPanel", cont), "usuarios");
   $$("[data-rol]", cont).forEach((s) => s.addEventListener("change", async () => {
     if (!resultado(await api(`/api/admin/usuarios/${s.dataset.rol}`, { method: "PATCH", body: { rol: s.value } }))) recargar();

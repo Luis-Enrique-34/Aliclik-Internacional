@@ -2,7 +2,7 @@
 import { api, html, raw, $, $$, numero, hace, encabezado, opciones, opcion, qs, paramsHash, vacio, drawer, modal, confirmar, resultado, datosForm, puede, pais, urlSegura, ESTADO_INT, badge, CHECKS, toast } from "../core.js";
 import { bitacora } from "./_seguimiento.js";
 import { editorEvento } from "./calendario.js";
-import { panelIndicadores, selectorOrden, ordenar } from "../indicadores.js";
+import { panelIndicadores, selectorOrden, enlazarOrden, ordenar } from "../indicadores.js";
 
 const telLimpio = (t) => String(t || "").replace(/[^\d]/g, "");
 const whatsapp = (t) => (telLimpio(t).length >= 8 ? html`<a href="https://wa.me/${telLimpio(t)}" target="_blank" rel="noopener noreferrer" title="Abrir WhatsApp"><i class="fab fa-whatsapp"></i> ${t}</a>` : t || "—");
@@ -107,11 +107,11 @@ async function detalle(id, recargar) {
 
 const SLA_DIAS = 30, SIN_MOV_DIAS = 7; // mismos valores que src/config/metas.js
 const dias = (v) => (v ? (Date.now() - new Date(v).getTime()) / 86400000 : null);
-const ORDEN_INT = [["avance", "Avance del checklist"], ["antiguedad", "Días abierta"], ["pedidos", "Pedidos 30 días"], ["movimiento", "Último seguimiento"],
-  ["proveedor", "Proveedor"], ["pais", "País"], ["estado", "Estado"]];
+const ORDEN_INT = [["avance", "Avance del checklist", "pct"], ["proveedor", "Proveedor", "texto"], ["almacen", "Almacén", "texto"], ["pais", "País", "texto"],
+  ["antiguedad", "Días abierta", "dias"], ["pedidos", "Pedidos 30 días", "num"], ["movimiento", "Último seguimiento", "fecha"], ["estado", "Estado (de pendiente a integrado)", "nivel"]];
 const CAMPOS_INT = {
   avance: (i) => i.avance, antiguedad: (i) => (i.estado === "integrado" ? null : dias(i.creado_en)), pedidos: (i) => i.pedidos_30d,
-  movimiento: (i) => i.ultimo_seguimiento_en || i.actualizado_en, proveedor: (i) => i.proveedor_nombre, pais: (i) => i.pais,
+  movimiento: (i) => i.ultimo_seguimiento_en || i.actualizado_en, proveedor: (i) => i.proveedor_nombre, almacen: (i) => i.almacen_nombre, pais: (i) => i.pais_nombre || i.pais,
   estado: (i) => ({ pendiente: 0, en_proceso: 1, pausado: 2, integrado: 3 })[i.estado],
 };
 
@@ -159,9 +159,8 @@ export async function render(cont) {
       <div class="campo"><label>Responsable</label><select class="ctrl" name="responsable">${opcion("", "Todos", v.responsable)}${opcion("_sin", "Sin asignar", v.responsable)}${responsables.map((x) => opcion(x, x, v.responsable))}</select></div>
       <div class="campo"><label>Pedidos</label><select class="ctrl" name="pedidos">${opcion("", "Todos", v.pedidos)}${opcion("con", "Ya vende (30 d)", v.pedidos)}${opcion("sin", "Sin pedidos", v.pedidos)}</select></div>
       <div class="campo buscador"><label>Buscar</label><input class="ctrl" name="q" value="${f.q}" placeholder="Proveedor, almacén o contacto" maxlength="80"></div>
-      <div class="campo">${selectorOrden(ORDEN_INT, v.orden, v.dir)}</div>
-      <button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button>
-      <a class="btn btn-ghost" href="#/integraciones">Limpiar</a>
+      ${selectorOrden(ORDEN_INT, v.orden, v.dir)}
+      <div class="filtros-acciones"><button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button><a class="btn btn-ghost" href="#/integraciones">Limpiar</a></div>
     </form>
     <p class="muted conteo">${numero(lista.length)} de ${numero(todas.length)} integraciones</p>
     <div class="card">${lista.length ? html`
@@ -184,7 +183,7 @@ export async function render(cont) {
     </div>`);
 
   $("#filtros", cont).addEventListener("submit", (e) => { e.preventDefault(); location.hash = `#/integraciones?${qs(Object.fromEntries(new FormData(e.target)))}`; });
-  for (const n of ["orden", "dir"]) $(`[name="${n}"]`, cont).addEventListener("change", () => $("#filtros", cont).requestSubmit());
+  enlazarOrden(cont, () => $("#filtros", cont).requestSubmit());
   panelIndicadores($("#indPanel", cont), "integraciones", { pais: f.pais });
   $("#nueva")?.addEventListener("click", async () => { const p = formulario(); setTimeout(enlazarNuevo, 60); if (await p) recargar(); });
   cont.onclick = async (e) => {

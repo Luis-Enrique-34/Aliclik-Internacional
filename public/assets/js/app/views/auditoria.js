@@ -22,12 +22,11 @@ export async function render(cont) {
       <div class="campo"><label>Usuario</label><select class="ctrl" name="usuario_id">${opcion("", "Todos", f.usuario_id)}${(ops.usuarios || []).map((u) => opcion(u.id, `${u.nombres} ${u.apellidos}`, f.usuario_id))}</select></div>
       <div class="campo"><label>Desde</label><input type="date" class="ctrl" name="desde" value="${f.desde}" max="${hoyIso()}"></div>
       <div class="campo"><label>Hasta</label><input type="date" class="ctrl" name="hasta" value="${f.hasta}" max="${hoyIso()}"></div>
-      <div class="campo"><label>IP</label><input class="ctrl" name="ip" value="${f.ip}" maxlength="45" placeholder="Ej. 190.12.…" style="width:140px"></div>
+      <div class="campo"><label>IP</label><input class="ctrl" name="ip" value="${f.ip}" maxlength="45" placeholder="Ej. 190.12.…"></div>
       <div class="campo buscador"><label>Buscar en detalle</label><input class="ctrl" name="q" value="${f.q}" maxlength="80" placeholder="Correo, registro, texto…"></div>
       <div class="campo"><label>Orden</label><select class="ctrl" name="orden">${opcion("desc", "Más recientes primero", f.orden)}${opcion("asc", "Más antiguos primero", f.orden)}</select></div>
       <div class="campo"><label>Mostrar</label><select class="ctrl" name="limite">${["200", "500", "1000"].map((n) => opcion(n, `${n} eventos`, f.limite))}</select></div>
-      <button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button>
-      <a class="btn btn-ghost" href="#/auditoria">Limpiar</a>
+      <div class="filtros-acciones"><button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button><a class="btn btn-ghost" href="#/auditoria">Limpiar</a></div>
     </form>
     <div class="card">${registros.length ? html`<div class="tabla-wrap"><table class="tabla">
       <thead><tr><th>Fecha</th><th>Acción</th><th>Usuario</th><th>Registro</th><th>IP</th><th>Detalle</th></tr></thead>

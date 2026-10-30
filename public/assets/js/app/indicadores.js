@@ -136,21 +136,44 @@ export async function panelIndicadores(cont, modulo, filtros = {}) {
 }
 
 // ------------------------------------------------------------- Ordenar listas (todos los módulos)
+// Un solo desplegable con opciones claras ("Avance %: mayor a menor", "Nombre: A → Z"…).
+// El valor elegido se guarda en dos campos ocultos (orden, dir) que viajan con el filtro.
+const SENTIDO = {
+  texto: [["asc", "A → Z"], ["desc", "Z → A"]],
+  num: [["desc", "mayor a menor"], ["asc", "menor a mayor"]],
+  pct: [["desc", "mayor a menor"], ["asc", "menor a mayor"]],
+  fecha: [["desc", "más reciente primero"], ["asc", "más antiguo primero"]],
+  dias: [["desc", "más días primero"], ["asc", "menos días primero"]],
+  nivel: [["desc", "más alto primero"], ["asc", "más bajo primero"]],
+};
+
 /**
- * Selector "Ordenar por" + dirección. Devuelve el HTML; leer el orden con leerOrden(form).
- * @param {[string,string][]} opciones [valor, texto]
+ * Campo "Ordenar por" (mismo alto y estilo que los demás filtros).
+ * @param {[string, string, ("texto"|"num"|"pct"|"fecha"|"dias"|"nivel")][]} opciones [campo, texto, tipo]
  */
 export function selectorOrden(opciones, actual = "", dir = "desc") {
-  return html`<div class="f orden-f">
-      <label for="orden">Ordenar por</label>
-      <div class="fila-flex orden-ctrl">
-        <select class="ctrl" name="orden" id="orden">${opciones.map(([v, t]) => html`<option value="${v}" ${v === actual ? raw("selected") : ""}>${t}</option>`)}</select>
-        <select class="ctrl dir" name="dir" aria-label="Dirección">
-          <option value="desc" ${dir === "desc" ? raw("selected") : ""}>↓ Mayor primero</option>
-          <option value="asc" ${dir === "asc" ? raw("selected") : ""}>↑ Menor primero</option>
-        </select>
-      </div>
+  return html`<div class="campo campo-orden">
+      <label for="ordenSel">Ordenar por</label>
+      <select class="ctrl" id="ordenSel" data-orden>
+        ${opciones.map(([v, t, tipo = "num"]) => html`<optgroup label="${t}${tipo === "pct" ? " (%)" : ""}">
+          ${SENTIDO[tipo].map(([d, txt]) => html`<option value="${v}|${d}" ${v === actual && d === dir ? raw("selected") : ""}>${t}${tipo === "pct" ? " %" : ""}: ${txt}</option>`)}
+        </optgroup>`)}
+      </select>
+      <input type="hidden" name="orden" value="${actual}"><input type="hidden" name="dir" value="${dir}">
     </div>`;
+}
+
+/** Al cambiar el orden: actualiza los campos ocultos y aplica (callback). */
+export function enlazarOrden(cont, aplicar) {
+  const sel = cont.querySelector("[data-orden]");
+  if (!sel) return;
+  sel.addEventListener("change", () => {
+    const [orden, dir] = sel.value.split("|");
+    const caja = sel.closest(".campo-orden");
+    caja.querySelector('[name="orden"]').value = orden;
+    caja.querySelector('[name="dir"]').value = dir;
+    aplicar();
+  });
 }
 
 /**

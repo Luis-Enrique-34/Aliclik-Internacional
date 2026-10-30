@@ -1,9 +1,10 @@
 // Listado de pedidos con filtros, paginación, exportación y detalle.
 import { api, html, raw, $, numero, dinero, fecha, fechaHora, hoyIso, GRUPOS, badgeGrupo, encabezado, opciones, opcion, qs, paramsHash, vacio, drawer, pais } from "../core.js";
-import { panelIndicadores, selectorOrden } from "../indicadores.js";
+import { panelIndicadores, selectorOrden, enlazarOrden } from "../indicadores.js";
 
-const ORDEN_PEDIDOS = [["fecha", "Fecha del pedido"], ["actualizacion", "Última actualización"], ["entrega", "Fecha de entrega"], ["total", "Monto"],
-  ["unidades", "Unidades"], ["estado", "Estado"], ["tienda", "Tienda"], ["proveedor", "Proveedor"], ["almacen", "Almacén"], ["courier", "Courier"], ["numero", "N° de pedido"]];
+const ORDEN_PEDIDOS = [["fecha", "Fecha del pedido", "fecha"], ["actualizacion", "Última actualización", "fecha"], ["entrega", "Fecha de entrega", "fecha"], ["total", "Monto", "num"],
+  ["unidades", "Unidades", "num"], ["tienda", "Tienda", "texto"], ["proveedor", "Proveedor", "texto"], ["almacen", "Almacén", "texto"], ["courier", "Courier", "texto"],
+  ["estado", "Estado", "texto"], ["numero", "N° de pedido", "texto"]];
 
 const ETIQ = { tienda_id: "Tienda", proveedor_id: "Proveedor", almacen_id: "Almacén", courier_id: "Courier" };
 
@@ -34,13 +35,12 @@ export async function render(cont) {
       <div class="campo"><label>Estado Aurora</label><select class="ctrl" name="estado">${opcion("", "Todos", f.estado)}${(est.data.estados || []).map((e) => opcion(e.estado_codigo, e.estado_label, f.estado))}</select></div>
       <div class="campo"><label>Pago</label><select class="ctrl" name="contraentrega">${opcion("", "Todos", f.contraentrega)}${opcion("si", "Contraentrega", f.contraentrega)}${opcion("no", "Pago anticipado", f.contraentrega)}</select></div>
       <div class="campo"><label>Antigüedad</label><select class="ctrl" name="estancados">${opcion("", "Todos", f.estancados)}${opcion("3", "En curso > 3 días", f.estancados)}${opcion("7", "En curso > 7 días", f.estancados)}${opcion("15", "En curso > 15 días", f.estancados)}</select></div>
-      <div class="campo"><label>Monto desde</label><input type="number" class="ctrl" name="monto_min" value="${f.monto_min}" min="0" step="0.01" style="width:110px"></div>
-      <div class="campo"><label>Monto hasta</label><input type="number" class="ctrl" name="monto_max" value="${f.monto_max}" min="0" step="0.01" style="width:110px"></div>
+      <div class="campo"><label>Monto desde</label><input type="number" class="ctrl" name="monto_min" value="${f.monto_min}" min="0" step="0.01"></div>
+      <div class="campo"><label>Monto hasta</label><input type="number" class="ctrl" name="monto_max" value="${f.monto_max}" min="0" step="0.01"></div>
       <div class="campo buscador"><label>Buscar</label><i class="fas fa-magnifying-glass" style="top:auto;bottom:12px;transform:none"></i><input class="ctrl" name="q" value="${f.q}" placeholder="N° pedido, tienda, proveedor…" maxlength="80"></div>
-      <div class="campo">${selectorOrden(ORDEN_PEDIDOS, f.orden, f.dir)}</div>
+      ${selectorOrden(ORDEN_PEDIDOS, f.orden, f.dir)}
       ${Object.keys(ETIQ).map((k) => html`<input type="hidden" name="${k}" value="${f[k]}">`)}
-      <button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button>
-      <a class="btn btn-ghost" href="#/pedidos">Limpiar</a>
+      <div class="filtros-acciones"><button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button><a class="btn btn-ghost" href="#/pedidos">Limpiar</a></div>
     </form>
     <div id="indPanel"></div>
     ${filtroEntidad ? html`<div class="aviso info"><i class="fas fa-filter"></i><div>Filtrando por <b>${ETIQ[filtroEntidad]}: ${nombreEntidad || f[filtroEntidad]}</b> (ID ${f[filtroEntidad]}). <a href="#/pedidos?${qs({ ...f, [filtroEntidad]: "", pagina: "" })}">Quitar filtro</a></div></div>` : ""}
@@ -71,7 +71,7 @@ export async function render(cont) {
 
   panelIndicadores($("#indPanel", cont), "pedidos", { pais: f.pais, tienda_id: f.tienda_id, proveedor_id: f.proveedor_id, almacen_id: f.almacen_id, courier_id: f.courier_id });
   // Cambiar el orden aplica al instante
-  for (const n of ["orden", "dir"]) $(`[name="${n}"]`, cont).addEventListener("change", () => $("#filtros", cont).requestSubmit());
+  enlazarOrden(cont, () => $("#filtros", cont).requestSubmit());
 
   $("#filtros", cont).addEventListener("submit", (e) => {
     e.preventDefault();

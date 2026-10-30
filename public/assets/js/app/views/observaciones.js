@@ -1,19 +1,20 @@
 // Observaciones de la plataforma internacional (hoja "Observaciones" del Excel) con seguimiento.
 import { api, html, raw, $, hace, encabezado, opciones, opcion, qs, paramsHash, vacio, drawer, modal, confirmar, resultado, datosForm, puede, pais, ESTADO_OBS, badge, toast } from "../core.js";
 import { bitacora } from "./_seguimiento.js";
-import { panelIndicadores, selectorOrden, ordenar } from "../indicadores.js";
+import { panelIndicadores, selectorOrden, enlazarOrden, ordenar } from "../indicadores.js";
 
 const PRIO = { alta: ["Alta", "b-danger"], media: ["Media", "b-warn"], baja: ["Baja", ""] };
 const SLA = { alta: 2, media: 5, baja: 10 }; // días para resolver (mismos valores que src/config/metas.js)
 const ABIERTA = (o) => !["resuelta", "descartada"].includes(o.estado);
 const edad = (o) => (Date.now() - new Date(o.creado_en).getTime()) / 86400000;
 const vencida = (o) => ABIERTA(o) && edad(o) > SLA[o.prioridad];
-const ORDEN_OBS = [["actualizada", "Última actualización"], ["creada", "Fecha de registro"], ["prioridad", "Prioridad"], ["edad", "Antigüedad"],
-  ["comentarios", "Comentarios"], ["estado", "Estado"], ["modulo", "Módulo"], ["numero", "Número"]];
+const ORDEN_OBS = [["actualizada", "Última actualización", "fecha"], ["creada", "Fecha de registro", "fecha"], ["prioridad", "Prioridad", "nivel"], ["edad", "Antigüedad (abiertas)", "dias"],
+  ["descripcion", "Descripción", "texto"], ["modulo", "Módulo", "texto"], ["responsable", "Responsable", "texto"], ["comentarios", "Comentarios", "num"], ["estado", "Estado (de abierta a cerrada)", "nivel"], ["numero", "Número", "num"]];
 const CAMPOS_OBS = {
   actualizada: (o) => o.actualizado_en, creada: (o) => o.creado_en, prioridad: (o) => ({ baja: 0, media: 1, alta: 2 })[o.prioridad],
   edad: (o) => (ABIERTA(o) ? edad(o) : null), comentarios: (o) => Number(o.comentarios) || 0,
   estado: (o) => ({ abierta: 0, en_proceso: 1, resuelta: 2, descartada: 3 })[o.estado], modulo: (o) => o.modulo, numero: (o) => o.numero,
+  descripcion: (o) => o.descripcion, responsable: (o) => o.responsable,
 };
 
 async function formulario(actual = null) {
@@ -96,9 +97,8 @@ export async function render(cont) {
       <div class="campo"><label>Responsable</label><select class="ctrl" name="responsable">${opcion("", "Todos", v.responsable)}${opcion("_sin", "Sin asignar", v.responsable)}${responsables.map((x) => opcion(x, x, v.responsable))}</select></div>
       <div class="campo"><label>SLA</label><select class="ctrl" name="sla">${opcion("", "Todas", v.sla)}${opcion("vencidas", "Vencidas", v.sla)}${opcion("en_plazo", "Abiertas en plazo", v.sla)}</select></div>
       <div class="campo buscador"><label>Buscar</label><input class="ctrl" name="q" value="${v.q}" placeholder="N° o texto" maxlength="80"></div>
-      <div class="campo">${selectorOrden(ORDEN_OBS, v.orden, v.dir)}</div>
-      <button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button>
-      <a class="btn btn-ghost" href="#/observaciones">Limpiar</a>
+      ${selectorOrden(ORDEN_OBS, v.orden, v.dir)}
+      <div class="filtros-acciones"><button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button><a class="btn btn-ghost" href="#/observaciones">Limpiar</a></div>
     </form>
     <p class="muted conteo">${lista.length} de ${todas.length} observaciones</p>
     <div class="card">${lista.length ? html`
@@ -114,7 +114,7 @@ export async function render(cont) {
       : vacio("fa-clipboard-check", "Sin observaciones", "Registra aquí los hallazgos de la operación internacional.")}
     </div>`);
   $("#filtros", cont).addEventListener("submit", (e) => { e.preventDefault(); location.hash = `#/observaciones?${qs(Object.fromEntries(new FormData(e.target)))}`; });
-  for (const n of ["orden", "dir"]) $(`[name="${n}"]`, cont).addEventListener("change", () => $("#filtros", cont).requestSubmit());
+  enlazarOrden(cont, () => $("#filtros", cont).requestSubmit());
   panelIndicadores($("#indPanel", cont), "observaciones", { pais: f.pais });
   $("#nueva")?.addEventListener("click", async () => { if (await formulario()) recargar(); });
   cont.onclick = (e) => { const tr = e.target.closest("tr[data-i]"); if (tr) detalle(lista[Number(tr.dataset.i)], recargar); };

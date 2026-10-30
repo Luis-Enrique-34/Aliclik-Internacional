@@ -633,3 +633,30 @@ code { overflow-wrap: anywhere; }
 /* Medidores y KPI en una sola grilla (sin huecos cuando hay pocos medidores) */
 .ind-tarjetas { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; align-items: stretch; }
 @media (max-width: 760px) { .ind-tarjetas { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } }
+
+/* =====================================================================
+   Barra de filtros alineada en grilla: todos los campos con el mismo
+   ancho base, etiquetas a la misma altura y botones al ras de los campos.
+   ===================================================================== */
+.filtros { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; align-items: end; }
+.filtros .campo { min-width: 0; }
+.filtros .ctrl { width: 100%; min-width: 0; }
+.filtros .buscador .ctrl { min-width: 0; }
+.filtros .campo.buscador, .filtros .campo-orden { grid-column: span 2; }
+.filtros > .btn { width: 100%; justify-content: center; height: 36px; }
+.filtros > span { align-self: center; justify-self: end; grid-column: -2 / -1; text-align: right; }
+.filtros label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.filtros input[type="number"].ctrl { width: 100% !important; }
+.campo-orden optgroup { font-weight: 700; color: var(--text-3); }
+.campo-orden option { color: var(--text); font-weight: 400; }
+@media (max-width: 760px) {
+  .filtros { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .filtros .campo.buscador, .filtros .campo-orden { grid-column: 1 / -1; }
+  .filtros > span { grid-column: 1 / -1; justify-self: start; text-align: left; }
+}
+@media (max-width: 400px) {
+  .filtros { grid-template-columns: 1fr; }
+}
+.filtros-acciones { display: flex; gap: 8px; align-items: end; grid-column: span 2; }
+.filtros-acciones .btn { flex: 1; justify-content: center; }
+@media (max-width: 760px) { .filtros-acciones { grid-column: 1 / -1; } }

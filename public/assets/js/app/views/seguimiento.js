@@ -10,7 +10,7 @@ import {
   vacio, modal, confirmar, resultado, datosForm, puede, pais, TIPOS, TIPO_UNO,
 } from "../core.js";
 import { graficoBarras } from "../charts.js";
-import { panelIndicadores, selectorOrden, ordenar } from "../indicadores.js";
+import { panelIndicadores, selectorOrden, enlazarOrden, ordenar } from "../indicadores.js";
 import { bitacora } from "./_seguimiento.js";
 import { editorEvento } from "./calendario.js";
 
@@ -30,9 +30,9 @@ const VIGENCIA = {
 };
 const ICONO_TIPO = { tienda: "fa-store", proveedor: "fa-industry", almacen: "fa-warehouse", courier: "fa-truck-fast" };
 const ORDEN_SALUD = { inactiva: 0, en_caida: 1, atencion: 2, estable: 3, creciendo: 4, sin_datos: 5 };
-const ORDEN_ACTORES = [["u30", "Pedidos (30 días)"], ["variacion", "Variación vs. 30 días previos"], ["mes", "Pedidos del mes"], ["avance", "Avance de la meta"],
-  ["proyeccion", "Proyección del mes"], ["efectividad", "Efectividad de entrega"], ["perdida", "% devoluciones"], ["ultimo", "Último pedido"],
-  ["salud", "Salud (de crítica a sana)"], ["acuerdos", "Acuerdos vigentes"], ["nombre", "Nombre"]];
+const ORDEN_ACTORES = [["u30", "Pedidos (30 días)", "num"], ["nombre", "Nombre", "texto"], ["avance", "Avance de la meta", "pct"], ["efectividad", "Efectividad de entrega", "pct"],
+  ["perdida", "Devoluciones y cancelaciones", "pct"], ["variacion", "Variación vs. 30 días previos", "pct"], ["mes", "Pedidos del mes", "num"], ["proyeccion", "Proyección del mes", "num"],
+  ["ultimo", "Último pedido", "fecha"], ["salud", "Salud (de crítica a sana)", "nivel"], ["acuerdos", "Acuerdos vigentes", "num"]];
 const CAMPOS_ACTOR = {
   u30: (e) => e.u30, variacion: (e) => e.variacion, mes: (e) => e.mes_actual, avance: (e) => e.avanceMeta, proyeccion: (e) => e.proyeccion,
   efectividad: (e) => e.tasaEntrega, perdida: (e) => e.tasaPerdida, ultimo: (e) => e.ultimo_pedido, salud: (e) => ORDEN_SALUD[e.salud],
@@ -195,11 +195,10 @@ async function renderLista(cont, tipo, h) {
           <div class="campo"><label>Segmento</label><select class="ctrl" name="segmento">${opcion("", "Todos", f.segmento)}${Object.entries(SEGMENTOS).map(([k, t]) => opcion(k, t, f.segmento))}</select></div>
           <div class="campo"><label>Meta del mes</label><select class="ctrl" name="meta">${opcion("", "Todas", v.meta)}${opcion("con", "Con meta", v.meta)}${opcion("sin", "Sin meta", v.meta)}${opcion("riesgo", "No llegaría a la meta", v.meta)}${opcion("cumple", "Cumpliría la meta", v.meta)}</select></div>
           <div class="campo"><label>Responsable</label><select class="ctrl" name="responsable">${opcion("", "Todos", v.responsable)}${opcion("_sin", "Sin asignar", v.responsable)}${responsables.map((x) => opcion(x, x, v.responsable))}</select></div>
-          <div class="campo"><label>Mín. pedidos 30 d</label><input type="number" class="ctrl" name="minimo" min="0" value="${v.minimo}" style="width:110px"></div>
+          <div class="campo"><label>Mín. pedidos 30 d</label><input type="number" class="ctrl" name="minimo" min="0" value="${v.minimo}"></div>
           <div class="campo buscador"><label>Buscar</label><input class="ctrl" name="q" value="${f.q}" placeholder="Nombre o ID de Aurora" maxlength="80"></div>
-          <div class="campo">${selectorOrden(ORDEN_ACTORES, v.orden, v.dir)}</div>
-          <button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button>
-          <a class="btn btn-ghost" href="#/seguimiento?tipo=${tipo}">Limpiar</a>
+          ${selectorOrden(ORDEN_ACTORES, v.orden, v.dir)}
+          <div class="filtros-acciones"><button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button><a class="btn btn-ghost" href="#/seguimiento?tipo=${tipo}">Limpiar</a></div>
         </form>
         <p class="muted conteo">${numero(filas.length)} de ${numero(r.data.filas.length)} ${TIPOS[tipo].toLowerCase()}</p>
         <div class="card">${filas.length ? html`
@@ -223,7 +222,7 @@ async function renderLista(cont, tipo, h) {
     </div>`);
 
   $("#filtros", cont).addEventListener("submit", (e) => { e.preventDefault(); location.hash = `#/seguimiento?${qs(Object.fromEntries(new FormData(e.target)))}`; });
-  for (const n of ["orden", "dir"]) $(`[name="${n}"]`, cont).addEventListener("change", () => $("#filtros", cont).requestSubmit());
+  enlazarOrden(cont, () => $("#filtros", cont).requestSubmit());
   panelIndicadores($("#indPanel", cont), "seguimiento", { tipo, pais: f.pais });
   $("#nuevaEnt")?.addEventListener("click", async () => { const n = await formEntidad(tipo); if (n) location.hash = `#/seguimiento?id=${n.id}`; });
   $("#verAlertas", cont)?.addEventListener("click", (ev) => { cont.querySelectorAll("[data-extra]").forEach((li) => (li.hidden = false)); ev.currentTarget.remove(); });
@@ -254,9 +253,8 @@ async function renderAcuerdos(cont, h) {
       <div class="campo"><label>Vigencia</label><select class="ctrl" name="vigencia">${opcion("", "Todas", v.vigencia)}${Object.entries(VIGENCIA).map(([k, [t]]) => opcion(k, t, v.vigencia))}</select></div>
       <div class="campo"><label>Beneficio</label><select class="ctrl" name="tipoAc">${opcion("", "Todos", v.tipoAc)}${Object.entries(TIPOS_ACUERDO).map(([k, t]) => opcion(k, t, v.tipoAc))}</select></div>
       <div class="campo buscador"><label>Buscar</label><input class="ctrl" name="q" value="${f.q}" placeholder="Tienda, proveedor o beneficio" maxlength="80"></div>
-      <div class="campo">${selectorOrden([["hasta", "Fecha de vencimiento"], ["desde", "Inicio de vigencia"], ["valor", "Valor"], ["umbral", "Pedidos para ganarlo"], ["para", "Tienda / actor"], ["titulo", "Beneficio"]], v.orden, v.dir)}</div>
-      <button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button>
-    </form>
+      ${selectorOrden([["hasta", "Fecha de vencimiento", "fecha"], ["desde", "Inicio de vigencia", "fecha"], ["para", "Tienda / actor", "texto"], ["titulo", "Beneficio", "texto"], ["valor", "Valor", "num"], ["umbral", "Pedidos para ganarlo", "num"]], v.orden, v.dir)}
+      <div class="filtros-acciones"><button class="btn btn-brand" type="submit"><i class="fas fa-filter"></i> Filtrar</button></div></form>
     <p class="muted conteo">${numero(lista.length)} acuerdos</p>
     <div class="card">${lista.length ? html`<div class="tabla-wrap"><table class="tabla">
       <thead><tr><th>Beneficio</th><th>Para</th><th>Tipo</th><th class="num">Valor</th><th>Condición</th><th>Vigencia</th><th>Estado</th><th></th></tr></thead>
@@ -270,7 +268,7 @@ async function renderAcuerdos(cont, h) {
         <td class="nowrap">${puede("escribir") ? html`<button class="icon-btn" data-editar="${i}" aria-label="Editar"><i class="fas fa-pen"></i></button>` : ""}</td>
       </tr>`)}</tbody></table></div>` : vacio("fa-percent", "Sin acuerdos con estos filtros", "Registra descuentos exclusivos o beneficios para tiendas, proveedores, almacenes o couriers.")}</div>`);
   $("#filtros", cont).addEventListener("submit", (e) => { e.preventDefault(); location.hash = `#/seguimiento?${qs(Object.fromEntries(new FormData(e.target)))}`; });
-  for (const n of ["orden", "dir"]) $(`[name="${n}"]`, cont).addEventListener("change", () => $("#filtros", cont).requestSubmit());
+  enlazarOrden(cont, () => $("#filtros", cont).requestSubmit());
   $("#nuevoAc")?.addEventListener("click", async () => { if (await formAcuerdo()) recargar(); });
   cont.onclick = async (e) => { const b = e.target.closest("[data-editar]"); if (b && (await formAcuerdo({ actual: lista[Number(b.dataset.editar)] }))) recargar(); };
 }

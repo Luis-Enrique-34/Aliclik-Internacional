@@ -66,7 +66,7 @@ export async function render(cont, _ctx, mantenerForzar = false) {
           <div class="der fila-flex" id="filtroCargas">
             <select class="ctrl ctrl-sm" name="origen" aria-label="Origen">${opcion("", "Todos los orígenes", v.origen)}${opcion("sync", "Automáticas", v.origen)}${opcion("csv", "CSV", v.origen)}</select>
             <select class="ctrl ctrl-sm" name="rechazos" aria-label="Rechazos">${opcion("", "Con o sin rechazos", v.rechazos)}${opcion("1", "Solo con rechazos", v.rechazos)}</select>
-            <select class="ctrl ctrl-sm" name="orden" aria-label="Ordenar">${opcion("fecha", "Más recientes", v.orden)}${opcion("filas", "Más filas", v.orden)}${opcion("nuevos", "Más pedidos nuevos", v.orden)}${opcion("rechazos", "Más rechazos", v.orden)}${opcion("duracion", "Más lentas", v.orden)}</select>
+            <select class="ctrl ctrl-sm" name="orden" aria-label="Ordenar">${opcion("fecha", "Fecha: más reciente", v.orden)}${opcion("filas", "Más filas", v.orden)}${opcion("nuevos", "Más pedidos nuevos", v.orden)}${opcion("rechazos", "Más rechazos", v.orden)}${opcion("duracion", "Más lentas", v.orden)}</select>
           </div></div>
           ${cargas.length ? html`<div class="tabla-wrap"><table class="tabla">
             <thead><tr><th>Fecha</th><th>Origen</th><th>Archivo</th><th class="num">Filas</th><th class="num">Nuevos</th><th class="num">Actualizados</th><th class="num">Rechazados</th><th>Pedidos entre</th><th>Usuario</th></tr></thead>
